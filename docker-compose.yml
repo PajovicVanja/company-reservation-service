@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  company-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: docker.io/pajovicv/companyandreservationservices:latest
+    ports:
+      - "8082:8080"
+    env_file:
+      - .env
+    environment:
+      # Explicitly forward only what the app uses (values come from .env)
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      MINIO_SECRETE_KEY: ${MINIO_SECRETE_KEY}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_PUBLIC_BUCKET: ${MINIO_PUBLIC_BUCKET}
+      SMS_API_KEY: ${SMS_API_KEY}
+      EMPLOYEE_SERVICE_URL: ${EMPLOYEE_SERVICE_URL}
+      EMPLOYEE_SERVICE_TOKEN: ${EMPLOYEE_SERVICE_TOKEN}
