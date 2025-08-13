@@ -1,22 +1,16 @@
-FROM openjdk:21-jdk-slim
-WORKDIR /app
+# syntax=docker/dockerfile:1
 
-COPY mvnw .
+FROM maven:3.9.6-eclipse-temurin-21-alpine AS build
+WORKDIR /build
+COPY pom.xml ./
 COPY .mvn/ .mvn/
-COPY pom.xml .
-
-# Ensure the Maven wrapper has execution permissions
-RUN chmod +x ./mvnw
-
-# Download dependencies
-RUN ./mvnw dependency:go-offline -B
-
-# Copy the project source
+COPY mvnw ./
+RUN chmod +x mvnw && ./mvnw -q -B -DskipTests dependency:go-offline
 COPY src ./src
+RUN ./mvnw -q -B -DskipTests package spring-boot:repackage
 
-# Package the application
-RUN ./mvnw package -DskipTests
-
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=build /build/target/*.jar app.jar
 EXPOSE 8080
-
-ENTRYPOINT ["java", "-jar", "target/App-1.jar"]
+ENTRYPOINT ["java","-jar","/app/app.jar"]

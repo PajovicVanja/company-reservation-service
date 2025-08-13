@@ -2,14 +2,11 @@ package org.soa.companyService.dto;
 
 public class UpdateSmsNotificationConfigRequest {
     private String name;
+    private String notificationMessage;
 
-    // Getters and Setters
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
 
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
+    public String getNotificationMessage() { return notificationMessage; }
+    public void setNotificationMessage(String notificationMessage) { this.notificationMessage = notificationMessage; }
 }

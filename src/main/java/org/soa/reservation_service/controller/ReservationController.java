@@ -6,9 +6,11 @@ import org.soa.reservation_service.service.ReservationService;
 import org.soa.reservation_service.service.StatusService;
 import org.soa.reservation_service.service.PaymentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -41,21 +43,30 @@ public class ReservationController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // No signature change; service will read request.getEmployeeId()
     @PostMapping
     public ResponseEntity<Reservation> createReservation(@RequestBody ReservationCreateRequest request) {
         Reservation createdReservation = reservationService.createReservation(request);
         return ResponseEntity.ok(createdReservation);
     }
 
-    // No signature change; pass the (optional) employeeId through to the service
+    /**
+     * Changed from GET-with-body to GET-with-query-params.
+     * Example:
+     *   GET /api/reservations/free-slots/42?date=2025-01-31T10:00:00&serviceId=7&employeeId=123
+     * `employeeId` is optional.
+     */
     @GetMapping("/free-slots/{idCompany}")
-    public ResponseEntity<List<String>> getFreeSlots(@RequestBody FreeTerminRequest request, @PathVariable Long idCompany) {
+    public ResponseEntity<List<String>> getFreeSlots(
+            @PathVariable Long idCompany,
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime date,
+            @RequestParam("serviceId") Long serviceId,
+            @RequestParam(value = "employeeId", required = false) Long employeeId) {
+
         List<String> list = reservationService.getFreeSlots(
                 idCompany,
-                request.date,
-                request.serviceId,
-                request.employeeId // newly forwarded optional filter
+                date,
+                serviceId,
+                employeeId
         );
         return ResponseEntity.ok(list);
     }

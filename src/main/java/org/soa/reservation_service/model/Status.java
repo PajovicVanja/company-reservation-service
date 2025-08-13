@@ -16,7 +16,7 @@ public class Status {
     @Column(columnDefinition = "TEXT")
     private String name;
 
-    @Column(name = "created_at")
+    @Column(name = "created_at", nullable = false, updatable = false, insertable = false)
     private Timestamp createdAt;
 
     @Column(name = "added_by")

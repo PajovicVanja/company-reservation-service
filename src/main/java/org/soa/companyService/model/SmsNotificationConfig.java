@@ -1,6 +1,7 @@
 package org.soa.companyService.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.sql.Timestamp;
 
@@ -12,7 +13,9 @@ public class SmsNotificationConfig {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "created_at", updatable = false)
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Timestamp createdAt;
 
     @Column(name = "name")

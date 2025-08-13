@@ -42,9 +42,9 @@ public class ServiceController {
 
     @Operation(summary = "Get all services", description = "Returns a list of all services")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved the list",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = ServiceM.class)))
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved the list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ServiceM.class)))
     })
     @GetMapping("company/{idCompany}")
     public ResponseEntity<List<ServiceM>> getAllServices(@PathVariable Long idCompany) {
@@ -61,11 +61,11 @@ public class ServiceController {
 
     @Operation(summary = "Get service by ID", description = "Returns a single service by its ID")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved the service",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = ServiceM.class))),
-        @ApiResponse(responseCode = "404", description = "Service not found",
-                content = @Content)
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved the service",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ServiceM.class))),
+            @ApiResponse(responseCode = "404", description = "Service not found",
+                    content = @Content)
     })
     @GetMapping("/{id}")
     public ResponseEntity<ServiceM> getServiceById(
@@ -77,18 +77,18 @@ public class ServiceController {
 
     @Operation(summary = "Create a new service", description = "Creates a new service with the provided information and optional picture")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully created the service",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = ServiceM.class))),
-        @ApiResponse(responseCode = "400", description = "Invalid input data or referenced entities not found",
-                content = @Content),
-        @ApiResponse(responseCode = "500", description = "Internal server error during file upload",
-                content = @Content)
+            @ApiResponse(responseCode = "200", description = "Successfully created the service",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ServiceM.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid input data or referenced entities not found",
+                    content = @Content),
+            @ApiResponse(responseCode = "500", description = "Internal server error during file upload",
+                    content = @Content)
     })
     @PostMapping
     public ResponseEntity<ServiceM> createService(
-            @Parameter(description = "Service creation request with all required details") @RequestBody CreateServiceRequest request,  
-            @Parameter(description = "Picture file to upload for the service") @RequestParam("file") MultipartFile file) {
+            @Parameter(description = "Service creation request with all required details") @RequestBody CreateServiceRequest request,
+            @Parameter(description = "Picture file to upload for the service") @RequestParam(value = "file", required = false) MultipartFile file) {
         ServiceM service = new ServiceM();
         service.setName(request.getName());
         service.setDescription(request.getDescription());
@@ -105,6 +105,7 @@ public class ServiceController {
         Company company = companyService.getCompanyById(request.getCompanyId())
                 .orElseThrow(() -> new RuntimeException("Company not found with id " + request.getCompanyId()));
         service.setCompany(company);
+
         if (file != null && !file.isEmpty()) {
             try {
                 ServiceM createdService = serviceService.createService(service, file);
@@ -120,17 +121,17 @@ public class ServiceController {
 
     @Operation(summary = "Update a service", description = "Updates an existing service by its ID")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully updated the service",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = ServiceM.class))),
-        @ApiResponse(responseCode = "404", description = "Service not found",
-                content = @Content),
-        @ApiResponse(responseCode = "400", description = "Invalid input data or referenced entities not found",
-                content = @Content)
+            @ApiResponse(responseCode = "200", description = "Successfully updated the service",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ServiceM.class))),
+            @ApiResponse(responseCode = "404", description = "Service not found",
+                    content = @Content),
+            @ApiResponse(responseCode = "400", description = "Invalid input data or referenced entities not found",
+                    content = @Content)
     })
     @PutMapping("/{id}")
     public ResponseEntity<ServiceM> updateService(
-            @Parameter(description = "ID of the service to update") @PathVariable Long id, 
+            @Parameter(description = "ID of the service to update") @PathVariable Long id,
             @Parameter(description = "Service update request with all required details") @RequestBody UpdateServiceRequest request) {
         try {
             ServiceM service = new ServiceM();
@@ -159,10 +160,10 @@ public class ServiceController {
 
     @Operation(summary = "Delete a service", description = "Deletes a service by its ID")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "204", description = "Successfully deleted the service",
-                content = @Content),
-        @ApiResponse(responseCode = "404", description = "Service not found",
-                content = @Content)
+            @ApiResponse(responseCode = "204", description = "Successfully deleted the service",
+                    content = @Content),
+            @ApiResponse(responseCode = "404", description = "Service not found",
+                    content = @Content)
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteService(
@@ -173,16 +174,16 @@ public class ServiceController {
 
     @Operation(summary = "Upload service picture", description = "Uploads a picture for a specific service")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully uploaded the picture",
-                content = @Content),
-        @ApiResponse(responseCode = "404", description = "Service not found",
-                content = @Content),
-        @ApiResponse(responseCode = "500", description = "Internal server error during upload",
-                content = @Content)
+            @ApiResponse(responseCode = "200", description = "Successfully uploaded the picture",
+                    content = @Content),
+            @ApiResponse(responseCode = "404", description = "Service not found",
+                    content = @Content),
+            @ApiResponse(responseCode = "500", description = "Internal server error during upload",
+                    content = @Content)
     })
     @PostMapping("/{id}/upload-picture")
     public ResponseEntity<Void> uploadPicture(
-            @Parameter(description = "ID of the service to upload picture for") @PathVariable Long id, 
+            @Parameter(description = "ID of the service to upload picture for") @PathVariable Long id,
             @Parameter(description = "Picture file to upload", required = true) @RequestParam("file") MultipartFile file) {
         logger.info("Uploading picture for service with ID: {}", id);
         try {

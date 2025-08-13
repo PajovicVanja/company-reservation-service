@@ -27,9 +27,9 @@ public class SmsNotificationConfigController {
 
     @Operation(summary = "Get all SMS notification configurations", description = "Returns a list of all SMS notification configurations")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved the list",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = SmsNotificationConfig.class)))
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved the list",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = SmsNotificationConfig.class)))
     })
     @GetMapping
     public List<SmsNotificationConfig> getAllSmsNotificationConfigs() {
@@ -38,11 +38,11 @@ public class SmsNotificationConfigController {
 
     @Operation(summary = "Get SMS notification configuration by ID", description = "Returns a single SMS notification configuration by its ID")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved the configuration",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = SmsNotificationConfig.class))),
-        @ApiResponse(responseCode = "404", description = "Configuration not found",
-                content = @Content)
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved the configuration",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = SmsNotificationConfig.class))),
+            @ApiResponse(responseCode = "404", description = "Configuration not found",
+                    content = @Content)
     })
     @GetMapping("/{id}")
     public ResponseEntity<SmsNotificationConfig> getSmsNotificationConfigById(
@@ -54,15 +54,16 @@ public class SmsNotificationConfigController {
 
     @Operation(summary = "Create a new SMS notification configuration", description = "Creates a new SMS notification configuration")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully created the configuration",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = SmsNotificationConfig.class)))
+            @ApiResponse(responseCode = "200", description = "Successfully created the configuration",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = SmsNotificationConfig.class)))
     })
     @PostMapping
     public ResponseEntity<SmsNotificationConfig> createSmsNotificationConfig(
             @Parameter(description = "SMS notification configuration details") @RequestBody CreateSmsNotificationConfigRequest request) {
         SmsNotificationConfig smsNotificationConfig = new SmsNotificationConfig();
         smsNotificationConfig.setName(request.getName());
+        smsNotificationConfig.setNotificationMessage(request.getNotificationMessage());
 
         SmsNotificationConfig createdSmsNotificationConfig = smsNotificationConfigService.createSmsNotificationConfig(smsNotificationConfig);
         return ResponseEntity.ok(createdSmsNotificationConfig);
@@ -70,11 +71,11 @@ public class SmsNotificationConfigController {
 
     @Operation(summary = "Update an SMS notification configuration", description = "Updates an existing SMS notification configuration by its ID")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully updated the configuration",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = SmsNotificationConfig.class))),
-        @ApiResponse(responseCode = "404", description = "Configuration not found",
-                content = @Content)
+            @ApiResponse(responseCode = "200", description = "Successfully updated the configuration",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = SmsNotificationConfig.class))),
+            @ApiResponse(responseCode = "404", description = "Configuration not found",
+                    content = @Content)
     })
     @PutMapping("/{id}")
     public ResponseEntity<SmsNotificationConfig> updateSmsNotificationConfig(
@@ -83,6 +84,7 @@ public class SmsNotificationConfigController {
         try {
             SmsNotificationConfig smsNotificationConfig = new SmsNotificationConfig();
             smsNotificationConfig.setName(request.getName());
+            smsNotificationConfig.setNotificationMessage(request.getNotificationMessage());
 
             SmsNotificationConfig updatedSmsNotificationConfig = smsNotificationConfigService.updateSmsNotificationConfig(id, smsNotificationConfig);
             return ResponseEntity.ok(updatedSmsNotificationConfig);
@@ -93,8 +95,8 @@ public class SmsNotificationConfigController {
 
     @Operation(summary = "Delete an SMS notification configuration", description = "Deletes an SMS notification configuration by its ID")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "204", description = "Successfully deleted the configuration",
-                content = @Content)
+            @ApiResponse(responseCode = "204", description = "Successfully deleted the configuration",
+                    content = @Content)
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSmsNotificationConfig(

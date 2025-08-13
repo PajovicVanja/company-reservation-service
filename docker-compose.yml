@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile
     image: docker.io/pajovicv/companyandreservationservices:latest
     ports:
-      - "8082:8080"
+      - "8082:8082"
     env_file:
       - .env
     environment:
@@ -21,3 +21,8 @@ services:
       SMS_API_KEY: ${SMS_API_KEY}
       EMPLOYEE_SERVICE_URL: ${EMPLOYEE_SERVICE_URL}
       EMPLOYEE_SERVICE_TOKEN: ${EMPLOYEE_SERVICE_TOKEN}
+      SERVER_ERROR_INCLUDE_MESSAGE: "always"
+      SERVER_ERROR_INCLUDE_STACKTRACE: "ALWAYS"
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_SERVLET_MVC_METHOD_ANNOTATION_REQUESTMAPPINGHANDLERMAPPING: DEBUG
+      # Optional: log request bodies/headers
+      SPRING_MVC_LOG_REQUEST_DETAILS: "true"
