@@ -1,10 +1,18 @@
 package org.soa.companyService.service;
 
+import com.google.gson.GsonBuilder;
 import org.soa.companyService.model.Company;
 import org.soa.companyService.repository.CompanyRepository;
+import org.soa.reservation_service.client.AdminClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Optional;
 import java.util.logging.Level;
@@ -19,6 +27,9 @@ public class CompanyService {
     @Autowired
     private S3ClientService s3ClientService;
 
+    @Autowired
+    private AdminClient adminClient;
+
     public List<Company> getAllCompanies() {
         return companyRepository.findAll();
     }
@@ -28,10 +39,14 @@ public class CompanyService {
     }
 
     public Company createCompany(Company company) {
+        adminClient.createCompany(company);
         return companyRepository.save(company);
     }
 
     public Company updateCompany(Long id, Company updatedCompany) {
+        try {
+            updateCompanyOnAdminService(id, updatedCompany);
+        } catch (IOException | InterruptedException ignored) {}
         return companyRepository.findById(id)
                 .map(company -> {
                     // Update fields
@@ -55,6 +70,9 @@ public class CompanyService {
     }
 
     public void deleteCompany(Long id) {
+        try {
+            deleteCompanyOnAdminService(id);
+        } catch (IOException | InterruptedException ignored) {}
         companyRepository.deleteById(id);
     }
 
@@ -70,4 +88,66 @@ public class CompanyService {
             }
         });
     }
+
+    private void createCompanyOnAdminService(Company company) throws IOException, InterruptedException {
+        // This method should call the administrator service to create a company
+        // For now, we will just log the action
+        Logger.getLogger(CompanyService.class.getName()).log(Level.INFO, "Creating company on admin service: {0}", company);
+        AdminCompanyRequest adminCompanyRequest = new AdminCompanyRequest(
+                company.getCompanyName(),
+                company.getFirstName() + " " + company.getLastName(),
+                company.getEmail(),
+                company.getDescription(),
+                company.getPhoneNumber(),
+                company.getAddress(),
+                company.getLocation().getStreet()
+        );
+        GsonBuilder gsonBuilder = new GsonBuilder();
+        HttpRequest request = HttpRequest
+                .newBuilder()
+                .uri(URI.create( System.getenv("admin_url") + "/api/v1/companies"))
+                .POST(HttpRequest.BodyPublishers.ofString(gsonBuilder.create().toJson(adminCompanyRequest)))
+                .header("Content-Type", "application/json")
+                .build();
+        HttpClient client = HttpClient.newBuilder().build();
+        client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private void updateCompanyOnAdminService(Long id, Company company) throws IOException, InterruptedException {
+        // This method should call the administrator service to create a company
+        // For now, we will just log the action
+        Logger.getLogger(CompanyService.class.getName()).log(Level.INFO, "Creating company on admin service: {0}", company);
+        AdminCompanyRequest adminCompanyRequest = new AdminCompanyRequest(
+                company.getCompanyName(),
+                company.getFirstName() + " " + company.getLastName(),
+                company.getEmail(),
+                company.getDescription(),
+                company.getPhoneNumber(),
+                company.getAddress(),
+                company.getLocation().getStreet()
+        );
+        GsonBuilder gsonBuilder = new GsonBuilder();
+        HttpRequest request = HttpRequest
+                .newBuilder()
+                .uri(URI.create( System.getenv("admin_url") + "/api/v1/companies/"+ id))
+                .PUT(HttpRequest.BodyPublishers.ofString(gsonBuilder.create().toJson(adminCompanyRequest)))
+                .header("Content-Type", "application/json")
+                .build();
+        HttpClient client = HttpClient.newBuilder().build();
+        client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+    private void deleteCompanyOnAdminService(Long id) throws IOException, InterruptedException {
+        // This method should call the administrator service to delete a company
+        Logger.getLogger(CompanyService.class.getName()).log(Level.INFO, "Deleting company on admin service with id: {0}", id);
+        HttpRequest request = HttpRequest
+                .newBuilder()
+                .uri(URI.create(System.getenv("admin_url") + "/api/v1/companies/" + id))
+                .DELETE()
+                .build();
+        HttpClient client = HttpClient.newBuilder().build();
+        client.send(request, HttpResponse.BodyHandlers.ofString());
+    }
+
+
 }

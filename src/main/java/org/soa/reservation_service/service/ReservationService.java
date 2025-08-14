@@ -7,6 +7,7 @@ import org.soa.companyService.model.ServiceM;
 import org.soa.companyService.service.BusinessHoursService;
 import org.soa.companyService.service.CompanyService;
 import org.soa.companyService.service.ServiceService;
+import org.soa.reservation_service.client.DiscountClient;
 import org.soa.reservation_service.client.EmployeeClient;
 import org.soa.reservation_service.dto.ReservationCreateRequest;
 import org.soa.reservation_service.dto.TimeInterval;
@@ -33,6 +34,7 @@ public class ReservationService {
     @Autowired private CompanyService companyService;
     @Autowired private PaymentService paymentService;
     @Autowired private ScheduledNotificationsService scheduledNotificationsService;
+    @Autowired private DiscountClient discountClient;
 
     // New: client for employee-service (REST)
     @Autowired private EmployeeClient employeeClient;
@@ -106,7 +108,7 @@ public class ReservationService {
                     (short) service.getDuration()
             );
         }
-
+        discountClient.addLoyaltyPoints(reservation.getIdCustomer(), reservation.getIdCustomer(), reservation.getIdService());
         newReservation.setSendSms(Timestamp.valueOf(calculateSmsNotificationTime(newReservation.getDate(), newReservation)));
         return reservationRepository.save(newReservation);
     }
