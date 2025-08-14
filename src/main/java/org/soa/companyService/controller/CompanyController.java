@@ -2,13 +2,14 @@ package org.soa.companyService.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.*;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.soa.companyService.dto.CreateCompanyRequest;
 import org.soa.companyService.dto.UpdateCompanyRequest;
+import org.soa.companyService.exception.ErrorResponse;
 import org.soa.companyService.model.Company;
 import org.soa.companyService.model.Location;
 import org.soa.companyService.model.SmsNotificationConfig;
@@ -16,70 +17,68 @@ import org.soa.companyService.service.CompanyService;
 import org.soa.companyService.service.LocationService;
 import org.soa.companyService.service.SmsNotificationConfigService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/companies")
+@RequestMapping(value = "/api/companies", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Company", description = "Company management API")
+@Validated
 public class CompanyController {
 
-    @Autowired
-    private CompanyService companyService;
-
-    @Autowired
-    private SmsNotificationConfigService smsNotificationConfigService;
-
-    @Autowired
-    private LocationService locationService;
+    @Autowired private CompanyService companyService;
+    @Autowired private SmsNotificationConfigService smsNotificationConfigService;
+    @Autowired private LocationService locationService;
 
     @Operation(summary = "Get all companies", description = "Returns a list of all companies")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved the list",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = Company.class)))
-    })
+    @ApiResponse(responseCode = "200", description = "List of companies",
+            content = @Content(mediaType = "application/json", array = @ArraySchema(schema = @Schema(implementation = Company.class)),
+                    examples = @ExampleObject(value = "[{\"id\":1,\"companyName\":\"Salon Nina\"}]")))
     @GetMapping
     public List<Company> getAllCompanies() {
         return companyService.getAllCompanies();
     }
 
     @Operation(summary = "Get company by ID", description = "Returns a single company by its ID")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved the company",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = Company.class))),
-        @ApiResponse(responseCode = "404", description = "Company not found",
-                content = @Content)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Company found",
+                    content = @Content(schema = @Schema(implementation = Company.class))),
+            @ApiResponse(responseCode = "404", description = "Company not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{id}")
     public ResponseEntity<Company> getCompanyById(
-            @Parameter(description = "ID of the company to retrieve") @PathVariable Long id) {
+            @Parameter(description = "ID of the company to retrieve", example = "1") @PathVariable Long id) {
         return companyService.getCompanyById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
     @Operation(summary = "Create a new company", description = "Creates a new company with the provided information")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully created the company",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = Company.class))),
-        @ApiResponse(responseCode = "400", description = "Invalid input data or referenced entities not found",
-                content = @Content)
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Company created",
+                    content = @Content(schema = @Schema(implementation = Company.class),
+                            examples = @ExampleObject(value = "{\"id\":10,\"companyName\":\"Barber Shop\"}"))),
+            @ApiResponse(responseCode = "400", description = "Invalid input or referenced entities not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @PostMapping
-    public ResponseEntity<Company> createCompany(
-            @Parameter(description = "Company creation request with all required details") @RequestBody CreateCompanyRequest request) {
-        // Map DTO to entity
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+            content = @Content(schema = @Schema(implementation = CreateCompanyRequest.class),
+                    examples = @ExampleObject(name = "CreateCompanyRequest",
+                            value = "{\"description\":\"Men haircuts\",\"idAuthUser\":\"auth-123\",\"uuidUrl\":\"abc-uuid\"," +
+                                    "\"address\":\"Main 1\",\"phoneNumber\":\"+38640111222\",\"email\":\"info@barber.si\"," +
+                                    "\"firstName\":\"Nina\",\"lastName\":\"Kos\",\"companyName\":\"Barber Shop\"," +
+                                    "\"locationId\":1,\"smsNotificationConfigId\":1}")))
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Company> createCompany(@Valid @RequestBody CreateCompanyRequest request) {
         Company company = new Company();
         company.setDescription(request.getDescription());
         company.setIdAuthUser(request.getIdAuthUser());
-        company.setUuidUrl(request.getUuidUrl()); // generisati uuidUrl
+        company.setUuidUrl(request.getUuidUrl());
         company.setAddress(request.getAddress());
         company.setPhoneNumber(request.getPhoneNumber());
         company.setEmail(request.getEmail());
@@ -87,97 +86,86 @@ public class CompanyController {
         company.setLastName(request.getLastName());
         company.setCompanyName(request.getCompanyName());
 
-        // Fetch and set Location
         Location location = locationService.getLocationById(request.getLocationId())
                 .orElseThrow(() -> new RuntimeException("Location not found with id " + request.getLocationId()));
         company.setLocation(location);
 
-        // Fetch and set SmsNotificationConfig
-        SmsNotificationConfig smsNotificationConfig = smsNotificationConfigService
+        SmsNotificationConfig smsCfg = smsNotificationConfigService
                 .getSmsNotificationConfigById(request.getSmsNotificationConfigId())
                 .orElseThrow(() -> new RuntimeException("SmsNotificationConfig not found with id " + request.getSmsNotificationConfigId()));
-        company.setSmsNotificationConfig(smsNotificationConfig);
+        company.setSmsNotificationConfig(smsCfg);
 
-        Company createdCompany = companyService.createCompany(company);
-        return ResponseEntity.ok(createdCompany);
+        Company created = companyService.createCompany(company);
+        return ResponseEntity.ok(created);
     }
 
     @Operation(summary = "Update a company", description = "Updates an existing company by its ID")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully updated the company",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = Company.class))),
-        @ApiResponse(responseCode = "404", description = "Company not found",
-                content = @Content),
-        @ApiResponse(responseCode = "400", description = "Invalid input data or referenced entities not found",
-                content = @Content)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Company updated",
+                    content = @Content(schema = @Schema(implementation = Company.class))),
+            @ApiResponse(responseCode = "404", description = "Company not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid input or referenced entities not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @PutMapping("/{id}")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+            content = @Content(schema = @Schema(implementation = UpdateCompanyRequest.class),
+                    examples = @ExampleObject(value = "{\"description\":\"Updated\",\"address\":\"New 2\"," +
+                            "\"phoneNumber\":\"+38640123456\",\"email\":\"contact@barber.si\",\"firstName\":\"Nina\"," +
+                            "\"lastName\":\"Kos\",\"companyName\":\"Barber Shop\",\"locationId\":1,\"smsNotificationConfigId\":1}")))
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Company> updateCompany(
-            @Parameter(description = "ID of the company to update") @PathVariable Long id, 
-            @Parameter(description = "Company update request with all required details") @RequestBody UpdateCompanyRequest request) {
-        try {
-            // Map DTO to entity
-            Company company = new Company();
-            company.setDescription(request.getDescription());
-            company.setIdPicture(request.getIdPicture());
-            company.setAddress(request.getAddress());
-            company.setPhoneNumber(request.getPhoneNumber());
-            company.setEmail(request.getEmail());
-            company.setFirstName(request.getFirstName());
-            company.setLastName(request.getLastName());
-            company.setCompanyName(request.getCompanyName());
+            @Parameter(description = "ID of the company to update", example = "1") @PathVariable Long id,
+            @Valid @RequestBody UpdateCompanyRequest request) {
+        Company company = new Company();
+        company.setDescription(request.getDescription());
+        company.setIdPicture(request.getIdPicture());
+        company.setAddress(request.getAddress());
+        company.setPhoneNumber(request.getPhoneNumber());
+        company.setEmail(request.getEmail());
+        company.setFirstName(request.getFirstName());
+        company.setLastName(request.getLastName());
+        company.setCompanyName(request.getCompanyName());
 
-            // Fetch and set Location
-            Location location = locationService.getLocationById(request.getLocationId())
-                    .orElseThrow(() -> new RuntimeException("Location not found with id " + request.getLocationId()));
-            company.setLocation(location);
+        Location location = locationService.getLocationById(request.getLocationId())
+                .orElseThrow(() -> new RuntimeException("Location not found with id " + request.getLocationId()));
+        company.setLocation(location);
 
-            // Fetch and set SmsNotificationConfig
-            SmsNotificationConfig smsNotificationConfig = smsNotificationConfigService
-                    .getSmsNotificationConfigById(request.getSmsNotificationConfigId())
-                    .orElseThrow(() -> new RuntimeException("SmsNotificationConfig not found with id " + request.getSmsNotificationConfigId()));
-            company.setSmsNotificationConfig(smsNotificationConfig);
+        SmsNotificationConfig smsCfg = smsNotificationConfigService
+                .getSmsNotificationConfigById(request.getSmsNotificationConfigId())
+                .orElseThrow(() -> new RuntimeException("SmsNotificationConfig not found with id " + request.getSmsNotificationConfigId()));
+        company.setSmsNotificationConfig(smsCfg);
 
-            Company updatedCompany = companyService.updateCompany(id, company);
-            return ResponseEntity.ok(updatedCompany);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        Company updated = companyService.updateCompany(id, company);
+        return ResponseEntity.ok(updated);
     }
 
     @Operation(summary = "Delete a company", description = "Deletes a company by its ID")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "204", description = "Successfully deleted the company",
-                content = @Content),
-        @ApiResponse(responseCode = "404", description = "Company not found",
-                content = @Content)
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Company deleted"),
+            @ApiResponse(responseCode = "404", description = "Company not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteCompany(
-            @Parameter(description = "ID of the company to delete") @PathVariable Long id) {
-        companyService.deleteCompany(id);
+            @Parameter(description = "ID of the company to delete", example = "1") @PathVariable Long id) {
+        companyService.deleteCompany(id); // 404 mapped by advice if missing
         return ResponseEntity.noContent().build();
     }
 
     @Operation(summary = "Upload company picture", description = "Uploads a picture for a specific company")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully uploaded the picture",
-                content = @Content),
-        @ApiResponse(responseCode = "404", description = "Company not found",
-                content = @Content),
-        @ApiResponse(responseCode = "500", description = "Internal server error during upload",
-                content = @Content)
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Picture uploaded"),
+            @ApiResponse(responseCode = "404", description = "Company not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "500", description = "Upload failed",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @PostMapping("/{id}/upload-picture")
+    @PostMapping(value = "/{id}/upload-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Void> uploadPicture(
-            @Parameter(description = "ID of the company to upload picture for") @PathVariable Long id, 
-            @Parameter(description = "Picture file to upload", required = true) @RequestParam("file") MultipartFile file) {
-        try {
-            companyService.uploadPicture(id, file);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+            @Parameter(description = "ID of the company to upload picture for", example = "1") @PathVariable Long id,
+            @Parameter(description = "Picture file to upload") @RequestPart("file") MultipartFile file) {
+        companyService.uploadPicture(id, file);
+        return ResponseEntity.ok().build();
     }
 }

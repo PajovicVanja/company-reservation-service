@@ -2,125 +2,109 @@ package org.soa.companyService.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.responses.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.soa.companyService.dto.CreateLocationRequest;
 import org.soa.companyService.dto.UpdateLocationRequest;
+import org.soa.companyService.exception.ErrorResponse;
 import org.soa.companyService.model.Location;
 import org.soa.companyService.service.LocationService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/locations")
+@RequestMapping(value = "/api/locations", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Location", description = "Location management API")
+@Validated
 public class LocationController {
 
-    @Autowired
-    private LocationService locationService;
+    @Autowired private LocationService locationService;
 
-    @Operation(summary = "Get all locations", description = "Returns a list of all locations")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved the list",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = Location.class)))
-    })
+    @Operation(summary = "Get all locations")
+    @ApiResponse(responseCode = "200", description = "List of locations",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = Location.class))))
     @GetMapping
-    public List<Location> getAllLocations() {
-        return locationService.getAllLocations();
-    }
+    public List<Location> getAllLocations() { return locationService.getAllLocations(); }
 
-    @Operation(summary = "Get location by ID", description = "Returns a single location by its ID")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully retrieved the location",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = Location.class))),
-        @ApiResponse(responseCode = "404", description = "Location not found",
-                content = @Content)
+    @Operation(summary = "Get location by ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Location found",
+                    content = @Content(schema = @Schema(implementation = Location.class))),
+            @ApiResponse(responseCode = "404", description = "Location not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{id}")
     public ResponseEntity<Location> getLocationById(
-            @Parameter(description = "ID of the location to retrieve") @PathVariable Long id) {
+            @Parameter(description = "Location ID", example = "1") @PathVariable Long id) {
         return locationService.getLocationById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .map(ResponseEntity::ok).orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
     }
 
-    @Operation(summary = "Create a new location", description = "Creates a new location with the provided information")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully created the location",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = Location.class))),
-        @ApiResponse(responseCode = "400", description = "Invalid input data or referenced entities not found",
-                content = @Content)
+    @Operation(summary = "Create location")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Location created",
+                    content = @Content(schema = @Schema(implementation = Location.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid input",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @PostMapping
-    public ResponseEntity<Location> createLocation(
-            @Parameter(description = "Location creation request with all required details") @RequestBody CreateLocationRequest request) {
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+            content = @Content(schema = @Schema(implementation = CreateLocationRequest.class),
+                    examples = @ExampleObject(value = "{\"name\":\"Trg Leona\",\"number\":\"3\",\"parentLocationId\":1}")))
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Location> createLocation(@Valid @RequestBody CreateLocationRequest request) {
         Location location = new Location();
         location.setStreet(request.getName());
         location.setNumber(request.getNumber());
-
-        // Fetch and set Parent Location if provided
         if (request.getParentLocationId() != null) {
-            Location parentLocation = locationService.getLocationById(request.getParentLocationId())
+            Location parent = locationService.getLocationById(request.getParentLocationId())
                     .orElseThrow(() -> new RuntimeException("Parent Location not found with id " + request.getParentLocationId()));
-            location.setParentLocation(parentLocation);
+            location.setParentLocation(parent);
         }
-
-        Location createdLocation = locationService.createLocation(location);
-        return ResponseEntity.ok(createdLocation);
+        Location created = locationService.createLocation(location);
+        return ResponseEntity.ok(created);
     }
 
-    @Operation(summary = "Update a location", description = "Updates an existing location by its ID")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Successfully updated the location",
-                content = @Content(mediaType = "application/json",
-                schema = @Schema(implementation = Location.class))),
-        @ApiResponse(responseCode = "404", description = "Location not found",
-                content = @Content),
-        @ApiResponse(responseCode = "400", description = "Invalid input data or referenced entities not found",
-                content = @Content)
+    @Operation(summary = "Update location")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Location updated",
+                    content = @Content(schema = @Schema(implementation = Location.class))),
+            @ApiResponse(responseCode = "404", description = "Location not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    @PutMapping("/{id}")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
+            content = @Content(schema = @Schema(implementation = UpdateLocationRequest.class),
+                    examples = @ExampleObject(value = "{\"name\":\"Nova ulica\",\"number\":\"12\"}")))
+    @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Location> updateLocation(
-            @Parameter(description = "ID of the location to update") @PathVariable Long id, 
-            @Parameter(description = "Location update request with all required details") @RequestBody UpdateLocationRequest request) {
-        try {
-            Location location = new Location();
-            location.setStreet(request.getName());
-            location.setNumber(request.getNumber());
-
-            // Fetch and set Parent Location if provided
-            if (request.getParentLocationId() != null) {
-                Location parentLocation = locationService.getLocationById(request.getParentLocationId())
-                        .orElseThrow(() -> new RuntimeException("Parent Location not found with id " + request.getParentLocationId()));
-                location.setParentLocation(parentLocation);
-            }
-
-            Location updatedLocation = locationService.updateLocation(id, location);
-            return ResponseEntity.ok(updatedLocation);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+            @Parameter(description = "Location ID", example = "1") @PathVariable Long id,
+            @Valid @RequestBody UpdateLocationRequest request) {
+        Location loc = new Location();
+        loc.setStreet(request.getName());
+        loc.setNumber(request.getNumber());
+        if (request.getParentLocationId() != null) {
+            Location parent = locationService.getLocationById(request.getParentLocationId())
+                    .orElseThrow(() -> new RuntimeException("Parent Location not found with id " + request.getParentLocationId()));
+            loc.setParentLocation(parent);
         }
+        Location updated = locationService.updateLocation(id, loc);
+        return ResponseEntity.ok(updated);
     }
 
-    @Operation(summary = "Delete a location", description = "Deletes a location by its ID")
-    @ApiResponses(value = {
-        @ApiResponse(responseCode = "204", description = "Successfully deleted the location",
-                content = @Content),
-        @ApiResponse(responseCode = "404", description = "Location not found",
-                content = @Content)
+    @Operation(summary = "Delete location")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Location deleted"),
+            @ApiResponse(responseCode = "404", description = "Location not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteLocation(
-            @Parameter(description = "ID of the location to delete") @PathVariable Long id) {
+            @Parameter(description = "Location ID", example = "1") @PathVariable Long id) {
         locationService.deleteLocation(id);
         return ResponseEntity.noContent().build();
     }

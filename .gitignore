@@ -34,3 +34,6 @@ build/
 /src/main/java/org/soa/FileContentExporter.java
 /output.txt
 /.env
+/set-env.ps1
+/reservation_service.txt
+/companyService.txt
