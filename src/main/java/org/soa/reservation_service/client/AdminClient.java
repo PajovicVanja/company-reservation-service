@@ -21,7 +21,7 @@ public class AdminClient {
     private final String baseUrl;
     private final Logger logger = Logger.getLogger(AdminClient.class.getName());
 
-    public AdminClient(@Value("${admin.service.url}") String baseUrl) {
+    public AdminClient(@Value("${ADMIN_SERVICE_URL}") String baseUrl) {
         this.restTemplate = new RestTemplate();
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }

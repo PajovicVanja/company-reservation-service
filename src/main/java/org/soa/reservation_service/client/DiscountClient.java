@@ -17,7 +17,7 @@ public class DiscountClient {
     private final String baseUrl;
     private final Logger logger = Logger.getLogger(DiscountClient.class.getName());
 
-    public DiscountClient(@Value("${discount.service.url}") String baseUrl) {
+    public DiscountClient(@Value("${DISCOUNT_SERVICE_URL}") String baseUrl) {
         this.restTemplate = new RestTemplate();
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
