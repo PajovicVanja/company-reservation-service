@@ -1,24 +1,26 @@
+// client/DiscountClient.java
 package org.soa.reservation_service.client;
 
-import jakarta.persistence.criteria.CriteriaBuilder.In;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.Logger;
 
 @Component
+@ConditionalOnProperty(name = "discount.service.url") // bean exists ONLY if property is set
 public class DiscountClient {
     private final RestTemplate restTemplate;
     private final String baseUrl;
     private final Logger logger = Logger.getLogger(DiscountClient.class.getName());
 
-    public DiscountClient(@Value("${DISCOUNT_SERVICE_URL}") String baseUrl) {
-        this.restTemplate = new RestTemplate();
+    public DiscountClient(RestTemplate restTemplate,
+                          @Value("${discount.service.url}") String baseUrl) {
+        this.restTemplate = restTemplate;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 
@@ -29,15 +31,17 @@ public class DiscountClient {
     }
 
     public void addLoyaltyPoints(Integer userId, Integer companyId, Long serviceId) {
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("serviceId", serviceId);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers());
-        ResponseEntity<Map> response = restTemplate.postForEntity(
-                baseUrl + "/api/user-points/user/" + userId + "/company/"+ companyId,
-                entity,
-                Map.class
-        );
-        logger.info("Tax added successfully: " + response.getBody());
+        try {
+            Map<String, Object> body = Map.of("serviceId", serviceId);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers());
+            restTemplate.postForEntity(
+                    baseUrl + "/api/user-points/user/" + userId + "/company/" + companyId,
+                    entity, Map.class
+            );
+            logger.info("[Discount] loyalty points call succeeded");
+        } catch (RestClientException ex) {
+            // swallow failures: log & move on so reservations still work
+            logger.warning("[Discount] service call failed (skipping): " + ex.getMessage());
+        }
     }
 }

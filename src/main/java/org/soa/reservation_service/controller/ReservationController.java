@@ -183,4 +183,14 @@ public class ReservationController {
             return ResponseEntity.notFound().build();
         }
     }
+
+    // Employee Service calls: GET {RESERVATION_SERVICE_URL}/reservations?employee_id={employee_id}
+    @Operation(summary = "List reservations by employee (for Employee Service proxy)")
+    @ApiResponse(responseCode = "200", description = "List of reservations",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = Reservation.class))))
+    @GetMapping(params = "employee_id")
+    public List<Reservation> getAllReservationsByEmployee(
+            @Parameter(description = "Employee ID", example = "321") @RequestParam("employee_id") Long employeeId) {
+        return reservationService.getReservationsByEmployee(employeeId);
+    }
 }

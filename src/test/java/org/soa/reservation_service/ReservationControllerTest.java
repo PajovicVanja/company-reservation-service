@@ -154,4 +154,20 @@ class ReservationControllerTest {
                 .andExpect(status().isNoContent());
         Mockito.verify(reservationService).cancelReservation(99L);
     }
+    @Test
+    void getAllByEmployee_ok() throws Exception {
+        // given
+        Mockito.when(reservationService.getReservationsByEmployee(321L))
+                .thenReturn(List.of(sample(11L), sample(12L)));
+
+        // when/then
+        mvc.perform(get("/api/reservations")
+                        .param("employee_id", "321"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].id", is(11)))
+                .andExpect(jsonPath("$[1].id", is(12)));
+
+        Mockito.verify(reservationService).getReservationsByEmployee(321L);
+    }
 }

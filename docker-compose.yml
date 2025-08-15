@@ -1,16 +1,18 @@
 version: '3.8'
+
 services:
   company-service:
     build:
       context: .
       dockerfile: Dockerfile
     image: docker.io/pajovicv/companyandreservationservices:latest
+    container_name: company-service
+    restart: unless-stopped
     ports:
       - "8082:8082"
     env_file:
       - .env
     environment:
-      # Explicitly forward only what the app uses (values come from .env)
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
@@ -19,10 +21,25 @@ services:
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_PUBLIC_BUCKET: ${MINIO_PUBLIC_BUCKET}
       SMS_API_KEY: ${SMS_API_KEY}
-      EMPLOYEE_SERVICE_URL: ${EMPLOYEE_SERVICE_URL}
+
+      # Employee service (reachable by name over soa-net)
+      EMPLOYEE_SERVICE_URL: ${EMPLOYEE_SERVICE_URL:-http://employee-svc:8000}
       EMPLOYEE_SERVICE_TOKEN: ${EMPLOYEE_SERVICE_TOKEN}
+
+      # add scheme so RestTemplate has a protocol
+      ADMIN_SERVICE_URL: ${ADMIN_SERVICE_URL:-http://admin-service:7001}
+      DISCOUNT_SERVICE_URL: ${DISCOUNT_SERVICE_URL:-http://discount-service:7000}
+
+      # extra logging
       SERVER_ERROR_INCLUDE_MESSAGE: "always"
       SERVER_ERROR_INCLUDE_STACKTRACE: "ALWAYS"
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB_SERVLET_MVC_METHOD_ANNOTATION_REQUESTMAPPINGHANDLERMAPPING: DEBUG
-      # Optional: log request bodies/headers
       SPRING_MVC_LOG_REQUEST_DETAILS: "true"
+
+    networks:
+      - soa-net
+
+networks:
+  soa-net:
+    external: true
+    name: soa-net

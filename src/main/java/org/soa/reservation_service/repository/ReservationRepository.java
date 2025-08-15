@@ -44,5 +44,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("SELECT month(r.date), COUNT(r) FROM Reservation r WHERE r.company.id = ?1 group by month(r.date)")
     List<Objects> monthlyRevenue(long companyId);
 
+    List<Reservation> findByEmployeeId(Long employeeId);
+
+
 
 }

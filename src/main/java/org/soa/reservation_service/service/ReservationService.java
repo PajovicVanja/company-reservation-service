@@ -17,6 +17,7 @@ import org.soa.reservation_service.model.Status;
 import org.soa.reservation_service.repository.ReservationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import java.util.logging.Logger;
 
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -26,7 +27,7 @@ import java.util.*;
 
 @Service
 public class ReservationService {
-
+    private static final Logger log = Logger.getLogger(ReservationService.class.getName());
     @Autowired private ReservationRepository reservationRepository;
     @Autowired private StatusService statusService;
     @Autowired private BusinessHoursService businessHoursService;
@@ -34,9 +35,7 @@ public class ReservationService {
     @Autowired private CompanyService companyService;
     @Autowired private PaymentService paymentService;
     @Autowired private ScheduledNotificationsService scheduledNotificationsService;
-    @Autowired private DiscountClient discountClient;
-
-    // New: client for employee-service (REST)
+    @Autowired(required = false) private DiscountClient discountClient; // optional bean
     @Autowired private EmployeeClient employeeClient;
 
     // Get all reservations
@@ -65,14 +64,14 @@ public class ReservationService {
         Reservation newReservation = new Reservation();
         newReservation.setDate(reservation.getDate());
         newReservation.setIdCustomer(reservation.getIdCustomer());
-        newReservation.setTwoFACode((long) new Random().nextInt(100000, 999999));
+        newReservation.setTwoFACode((long) new Random().nextInt(100000, 1_000_000)); // 6 digits
         newReservation.setNotified(false);
         newReservation.setHidden(false);
         newReservation.setCustomerEmail(reservation.getCustomerEmail());
         newReservation.setCustomerPhoneNumber(reservation.getCustomerPhoneNumber());
         newReservation.setCustomerFullName(reservation.getCustomerFullName());
 
-        Company company = reservation.getIdCompany() != null
+        Company company = (reservation.getIdCompany() != null)
                 ? companyService.getCompanyById(reservation.getIdCompany())
                 .orElseThrow(() -> new RuntimeException("Company not found with id " + reservation.getIdCompany()))
                 : null;
@@ -83,9 +82,7 @@ public class ReservationService {
         newReservation.setService(service);
 
         newReservation.setDateTo(
-                Timestamp.valueOf(
-                        reservation.getDate().toLocalDateTime().plusMinutes(service.getDuration())
-                )
+                Timestamp.valueOf(reservation.getDate().toLocalDateTime().plusMinutes(service.getDuration()))
         );
 
         newReservation.setStatus(statusService.getDefaultStatus());
@@ -95,10 +92,8 @@ public class ReservationService {
                         .orElseThrow(() -> new RuntimeException("Payment not found with id " + reservation.getPaymentId()))
         );
 
-        // Set employee id (no JPA relation)
         newReservation.setEmployeeId(reservation.getEmployeeId());
 
-        // Optional validation against employee-service
         if (reservation.getEmployeeId() != null) {
             employeeClient.assertEmployeeActive(reservation.getEmployeeId());
             employeeClient.assertEmployeeHasSkill(reservation.getEmployeeId(), reservation.getIdService());
@@ -108,11 +103,26 @@ public class ReservationService {
                     (short) service.getDuration()
             );
         }
-        discountClient.addLoyaltyPoints(reservation.getIdCustomer(), reservation.getIdCustomer(), reservation.getIdService());
-        newReservation.setSendSms(Timestamp.valueOf(calculateSmsNotificationTime(newReservation.getDate(), newReservation)));
+
+        // Only attempt discount if the bean exists and we have both IDs
+        if (discountClient != null && reservation.getIdCustomer() != null && reservation.getIdCompany() != null) {
+            try {
+                discountClient.addLoyaltyPoints(
+                        reservation.getIdCustomer(),
+                        reservation.getIdCompany().intValue(), // convert Long -> Integer
+                        reservation.getIdService()
+                );
+            } catch (Exception e) {
+                log.warning("[Discount] ignored error: " + e.getMessage());
+            }
+        }
+
+        newReservation.setSendSms(
+                Timestamp.valueOf(calculateSmsNotificationTime(newReservation.getDate(), newReservation))
+        );
+
         return reservationRepository.save(newReservation);
     }
-
     // problem sa vise konfuguracija ukljucenih
     public LocalDateTime calculateSmsNotificationTime(Timestamp date, Reservation reservation) {
         ScheduledNotifications notification = new ScheduledNotifications();
@@ -250,5 +260,9 @@ public class ReservationService {
                     return reservationRepository.save(existingReservation);
                 })
                 .orElseThrow(() -> new RuntimeException("Reservation not found with id " + id));
+    }
+
+    public List<org.soa.reservation_service.model.Reservation> getReservationsByEmployee(Long employeeId) {
+        return reservationRepository.findByEmployeeId(employeeId);
     }
 }
