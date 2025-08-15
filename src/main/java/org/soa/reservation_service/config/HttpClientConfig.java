@@ -9,7 +9,7 @@ import java.time.Duration;
 
 @Configuration
 public class HttpClientConfig {
-
+//
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
         return builder
