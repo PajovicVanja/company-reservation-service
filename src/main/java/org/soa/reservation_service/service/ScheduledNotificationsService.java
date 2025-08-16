@@ -5,6 +5,9 @@ import org.soa.reservation_service.repository.ScheduledNotificationsRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 @Service
 public class ScheduledNotificationsService {
 
@@ -12,6 +15,11 @@ public class ScheduledNotificationsService {
     private ScheduledNotificationsRepository scheduledNotificationsRepository;
 
     public ScheduledNotifications createScheduledNotification(ScheduledNotifications scheduledNotification) {
-         return scheduledNotificationsRepository.save(scheduledNotification);
+        // save() works for both create and update
+        return scheduledNotificationsRepository.save(scheduledNotification);
+    }
+
+    public List<ScheduledNotifications> findDue(LocalDateTime now) {
+        return scheduledNotificationsRepository.findTop200BySentFalseAndScheduledTimeLessThanEqual(now);
     }
 }
