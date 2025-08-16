@@ -11,24 +11,35 @@ services:
     ports:
       - "8082:8082"
     env_file:
-      - .env
+      - .env.company
     environment:
-      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
-      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
-      MINIO_SECRETE_KEY: ${MINIO_SECRETE_KEY}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_PUBLIC_BUCKET: ${MINIO_PUBLIC_BUCKET}
-      SMS_API_KEY: ${SMS_API_KEY}
+      # Database
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:mysql://db-mysql-fra1-44936-do-user-18276591-0.k.db.ondigitalocean.com:25060/comapny_reservation}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-doadmin}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-AVNS_-FxVjWsPbwWMkUsHlYf}
 
-      # Employee service (reachable by name over soa-net)
+      # MinIO
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-K41A0IFt0sD40gBdu6Dt}
+      MINIO_SECRETE_KEY: ${MINIO_SECRETE_KEY:-kyIM7eAyzhVjpNecnOa2A9uxMYA8no2C1troecAx}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://194.28.111.15:9001/}
+      MINIO_PUBLIC_BUCKET: ${MINIO_PUBLIC_BUCKET:-public}
+
+      # SMS / Notifications
+      SMS_API_KEY: ${SMS_API_KEY:-futuretech:DEdo2fcfW2}
+      SMS_FAAS_GRAPHQL_URL: ${SMS_FAAS_GRAPHQL_URL:-https://employee-company-faas.vercel.app/api/graphql}
+      SMS_SENDER_ID: ${SMS_SENDER_ID:-SomeSenderId}
+      SMS_DEFAULT_PHONE: ${SMS_DEFAULT_PHONE:-+38640111222}
+      CUSTOMER_FALLBACK_ID: ${CUSTOMER_FALLBACK_ID:-0}
+
+      # Employee service
       EMPLOYEE_SERVICE_URL: ${EMPLOYEE_SERVICE_URL:-http://employee-svc:8000}
-      EMPLOYEE_SERVICE_TOKEN: ${EMPLOYEE_SERVICE_TOKEN}
+      EMPLOYEE_SERVICE_TOKEN: ${EMPLOYEE_SERVICE_TOKEN:-}
 
-      # add scheme so RestTemplate has a protocol
+      # Other services
       ADMIN_SERVICE_URL: ${ADMIN_SERVICE_URL:-http://admin-service:7001}
-      DISCOUNT_SERVICE_URL: ${DISCOUNT_SERVICE_URL:-http://discount-service:7000}
+      DISCOUNT_SERVICE_URL: ${DISCOUNT_SERVICE_URL:-}
+      USER_SERVICE_URL: ${USER_SERVICE_URL:-http://user-service:3000/api}
+      ANALYTICS_SERVICE_URL: ${ANALYTICS_SERVICE_URL:-http://analytics-service:8000}
 
       # extra logging
       SERVER_ERROR_INCLUDE_MESSAGE: "always"

@@ -8,6 +8,8 @@ import org.soa.companyService.service.CompanyService;
 import org.soa.companyService.service.ServiceService;
 import org.soa.reservation_service.client.DiscountClient;
 import org.soa.reservation_service.client.EmployeeClient;
+import org.soa.reservation_service.client.UserClient;
+import org.soa.reservation_service.client.AnalyticsClient; // ⬅ added
 import org.soa.reservation_service.dto.ReservationCreateRequest;
 import org.soa.reservation_service.dto.TimeInterval;
 import org.soa.reservation_service.model.Reservation;
@@ -42,6 +44,8 @@ public class ReservationService {
     @Autowired(required = false) private DiscountClient discountClient; // optional bean
     @Autowired private EmployeeClient employeeClient;
     @Autowired private ReservationNotificationService reservationNotificationService; // immediate SMS
+    @Autowired private UserClient userClient; // user-service lookup for full name
+    @Autowired(required = false) private AnalyticsClient analyticsClient; // ⬅ optional analytics
 
     // IMPORTANT: Integer here to match Reservation.idCustomer (Integer)
     @Value("${CUSTOMER_FALLBACK_ID:0}")
@@ -84,16 +88,12 @@ public class ReservationService {
 
         // required/core fields
         newReservation.setDate(reservation.getDate());
-        newReservation.setIdCustomer(resolveCustomerId(reservation)); // Integer ✔
+        Integer resolvedCustomerId = resolveCustomerId(reservation);
+        newReservation.setIdCustomer(resolvedCustomerId); // Integer ✔
         long sixDigits = ThreadLocalRandom.current().nextInt(100_000, 1_000_000);
         newReservation.setTwoFACode(sixDigits);
         newReservation.setNotified(false); // will flip to true after immediate SMS
         newReservation.setHidden(false);
-
-        // customer-facing fields
-        newReservation.setCustomerEmail(reservation.getCustomerEmail());
-        newReservation.setCustomerPhoneNumber(reservation.getCustomerPhoneNumber());
-        newReservation.setCustomerFullName(reservation.getCustomerFullName());
 
         // company (optional)
         Company company = (reservation.getIdCompany() != null)
@@ -120,6 +120,29 @@ public class ReservationService {
                 paymentService.getPaymentById(reservation.getPaymentId())
                         .orElseThrow(() -> new RuntimeException("Payment not found with id " + reservation.getPaymentId()))
         );
+
+        // customer-facing fields (name, email, phone)
+        // 1) start from request values
+        String fullName = reservation.getCustomerFullName();
+        Long phone = reservation.getCustomerPhoneNumber();
+        String email = reservation.getCustomerEmail();
+
+        // 2) if we have a customer id but no name provided, try User Service (fallback-safe)
+        if ((fullName == null || fullName.isBlank()) && resolvedCustomerId != null && resolvedCustomerId > 0) {
+            try {
+                String fetched = userClient.safeGetName(resolvedCustomerId);
+                if (fetched != null && !fetched.isBlank()) {
+                    fullName = fetched;
+                }
+            } catch (Exception ex) {
+                // absolutely do not fail the reservation flow because user-service is down
+                log.warning("[Reservation] User Service lookup failed (continuing with fallback): " + ex.getMessage());
+            }
+        }
+
+        newReservation.setCustomerFullName(fullName);
+        newReservation.setCustomerPhoneNumber(phone);
+        newReservation.setCustomerEmail(email);
 
         // employee checks (optional if employeeId missing)
         newReservation.setEmployeeId(reservation.getEmployeeId());
@@ -161,6 +184,15 @@ public class ReservationService {
         reservationNotificationService.sendReservationCreated(saved);
         saved.setNotified(true);
         saved = reservationRepository.save(saved);
+
+        // 4) Analytics (best-effort, never breaks flow)
+        if (analyticsClient != null) {
+            try {
+                analyticsClient.onReservationCreated(saved);
+            } catch (Exception ex) {
+                log.warning("[Analytics] onReservationCreated failed (continuing): " + ex.getMessage());
+            }
+        }
 
         return saved;
     }
@@ -304,7 +336,7 @@ public class ReservationService {
                 .toList();
     }
 
-    private List<TimeInterval> getBusyHours(List<Reservation> listOfUsedTermins, BusinessHours businessHour) {
+    private List<TimeInterval> getBusyHours(List<Reservation> listOfUsedTermins, org.soa.companyService.model.BusinessHours businessHour) {
         List<TimeInterval> busySlots = new ArrayList<>();
 
         // lunch/pause
