@@ -1,8 +1,11 @@
 package org.soa.reservation_service.service;
 
+import jakarta.annotation.PostConstruct;
 import org.soa.companyService.model.SmsNotificationConfig;
 import org.soa.companyService.service.SmsFaasClient;
+import org.soa.reservation_service.client.UserClient;
 import org.soa.reservation_service.model.Reservation;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,17 +20,27 @@ import java.util.logging.Logger;
 public class ReservationNotificationService {
 
     private static final Logger log = Logger.getLogger(ReservationNotificationService.class.getName());
+    private static final String HARD_FALLBACK_PHONE = "+38640111222"; // last-resort fallback
 
     private final SmsFaasClient smsFaasClient;
 
+    // Optional: we can try to read user's phone from user-service when reservation has only idCustomer
+    @Autowired(required = false)
+    private UserClient userClient;
+
     @Value("${SMS_DEFAULT_PHONE:+38640111222}")
-    private String defaultPhone;
+    private String defaultPhone; // may be null/blank if env isn't passed correctly
 
     @Value("${SMS_CONFIRM_TEMPLATE_ID:}")
     private String confirmTemplateId; // optional template for confirmation
 
     public ReservationNotificationService(SmsFaasClient smsFaasClient) {
         this.smsFaasClient = smsFaasClient;
+    }
+
+    @PostConstruct
+    public void logConfig() {
+        log.info("[SMS] SMS_DEFAULT_PHONE resolved to: '" + (defaultPhone == null ? "null" : defaultPhone) + "'");
     }
 
     /** Immediate confirmation at reservation creation. */
@@ -77,12 +90,35 @@ public class ReservationNotificationService {
         }
     }
 
+    /**
+     * Choose the best phone:
+     * 1) reservation.customerPhoneNumber
+     * 2) user-service phone (if idCustomer present and client available)
+     * 3) SMS_DEFAULT_PHONE env/property (if non-blank)
+     * 4) HARD_FALLBACK_PHONE constant as last resort
+     */
     private String resolvePhone(Reservation reservation) {
         if (reservation.getCustomerPhoneNumber() != null && reservation.getCustomerPhoneNumber() > 0) {
-            return String.valueOf(reservation.getCustomerPhoneNumber());
+            String p = String.valueOf(reservation.getCustomerPhoneNumber());
+            log.info("[SMS] Using phone from reservation: " + p);
+            return p;
         }
-        return defaultPhone;
+        if (userClient != null && reservation.getIdCustomer() != null && reservation.getIdCustomer() > 0) {
+            try {
+                Long p = userClient.safeGetPhoneAsLong(reservation.getIdCustomer());
+                if (p != null && p > 0) {
+                    log.info("[SMS] Using phone from user-service: " + p);
+                    return String.valueOf(p);
+                }
+            } catch (Exception ex) {
+                log.warning("[SMS] user-service phone lookup failed (continuing): " + ex.getMessage());
+            }
+        }
+        String envFallback = (defaultPhone != null && !defaultPhone.isBlank()) ? defaultPhone : HARD_FALLBACK_PHONE;
+        log.info("[SMS] Using fallback phone: " + envFallback);
+        return envFallback;
     }
+
 
     private String buildConfirmationMessage(Reservation r) {
         String when = formatWhen(r.getDate().toLocalDateTime());
@@ -94,7 +130,6 @@ public class ReservationNotificationService {
 
     private static String formatWhen(LocalDateTime dt) {
         return dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
-        // adjust format to your locale if desired
     }
 
     private static String safe(String s, String fallback) {

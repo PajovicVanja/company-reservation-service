@@ -12,6 +12,7 @@ import org.soa.reservation_service.client.UserClient;
 import org.soa.reservation_service.client.AnalyticsClient; // ⬅ added
 import org.soa.reservation_service.dto.ReservationCreateRequest;
 import org.soa.reservation_service.dto.TimeInterval;
+import org.soa.reservation_service.dto.UserDto;
 import org.soa.reservation_service.model.Reservation;
 import org.soa.reservation_service.model.ScheduledNotifications;
 import org.soa.reservation_service.model.Status;
@@ -41,13 +42,12 @@ public class ReservationService {
     @Autowired private CompanyService companyService;
     @Autowired private PaymentService paymentService;
     @Autowired private ScheduledNotificationsService scheduledNotificationsService;
-    @Autowired(required = false) private DiscountClient discountClient; // optional bean
+    @Autowired(required = false) private DiscountClient discountClient; // optional
     @Autowired private EmployeeClient employeeClient;
-    @Autowired private ReservationNotificationService reservationNotificationService; // immediate SMS
-    @Autowired private UserClient userClient; // user-service lookup for full name
-    @Autowired(required = false) private AnalyticsClient analyticsClient; // ⬅ optional analytics
+    @Autowired private ReservationNotificationService reservationNotificationService;
+    @Autowired private UserClient userClient; // user-service lookup
+    @Autowired(required = false) private AnalyticsClient analyticsClient;
 
-    // IMPORTANT: Integer here to match Reservation.idCustomer (Integer)
     @Value("${CUSTOMER_FALLBACK_ID:0}")
     private Integer customerFallbackId;
 
@@ -92,7 +92,7 @@ public class ReservationService {
         newReservation.setIdCustomer(resolvedCustomerId); // Integer ✔
         long sixDigits = ThreadLocalRandom.current().nextInt(100_000, 1_000_000);
         newReservation.setTwoFACode(sixDigits);
-        newReservation.setNotified(false); // will flip to true after immediate SMS
+        newReservation.setNotified(false);
         newReservation.setHidden(false);
 
         // company (optional)
@@ -121,22 +121,35 @@ public class ReservationService {
                         .orElseThrow(() -> new RuntimeException("Payment not found with id " + reservation.getPaymentId()))
         );
 
-        // customer-facing fields (name, email, phone)
-        // 1) start from request values
+        // Start with values from the request payload
         String fullName = reservation.getCustomerFullName();
         Long phone = reservation.getCustomerPhoneNumber();
         String email = reservation.getCustomerEmail();
 
-        // 2) if we have a customer id but no name provided, try User Service (fallback-safe)
-        if ((fullName == null || fullName.isBlank()) && resolvedCustomerId != null && resolvedCustomerId > 0) {
-            try {
-                String fetched = userClient.safeGetName(resolvedCustomerId);
-                if (fetched != null && !fetched.isBlank()) {
-                    fullName = fetched;
-                }
-            } catch (Exception ex) {
-                // absolutely do not fail the reservation flow because user-service is down
-                log.warning("[Reservation] User Service lookup failed (continuing with fallback): " + ex.getMessage());
+        // If the caller provided a real user id (>0), we must verify it exists
+        if (resolvedCustomerId != null && resolvedCustomerId > 0) {
+            var userOpt = userClient.getUserById(resolvedCustomerId);
+            if (userOpt.isEmpty()) {
+                // hard fail: do not create reservation for non-existing user
+                throw new RuntimeException("User not found with id " + resolvedCustomerId);
+            }
+            UserDto user = userOpt.get();
+
+            // Prefer first_name + last_name coming from user-service
+            String fromServiceName = user.getFullName();
+            if (fromServiceName != null && !fromServiceName.isBlank()) {
+                fullName = fromServiceName;
+            }
+
+            // Future-proof phone: try to read it if the service starts returning it
+            if (phone == null) {
+                Long phoneFromService = normalizePhoneToLong(user.getPhoneNumber());
+                if (phoneFromService != null) phone = phoneFromService;
+            }
+
+            // Prefer email from user-service if request is empty
+            if ((email == null || email.isBlank()) && user.getEmail() != null && !user.getEmail().isBlank()) {
+                email = user.getEmail();
             }
         }
 
@@ -160,7 +173,7 @@ public class ReservationService {
         Integer customerIdInt = newReservation.getIdCustomer(); // Integer ✔
         Long companyIdLong = reservation.getIdCompany();
         Integer companyIdInt = (companyIdLong != null ? companyIdLong.intValue() : null);
-        Long serviceIdLong = reservation.getIdService(); // third param is Long ✔
+        Long serviceIdLong = reservation.getIdService();
 
         if (discountClient != null
                 && customerIdInt != null && customerIdInt > 0
@@ -175,7 +188,7 @@ public class ReservationService {
         // 1) Persist reservation FIRST to ensure we have a non-null ID
         Reservation saved = reservationRepository.save(newReservation);
 
-        // 2) Compute and store scheduled reminder time (e.g., one day/hour before)
+        // 2) Compute and store scheduled reminder time
         LocalDateTime scheduled = calculateSmsNotificationTime(saved.getDate(), saved);
         saved.setSendSms(Timestamp.valueOf(scheduled));
         saved = reservationRepository.save(saved);
@@ -185,7 +198,7 @@ public class ReservationService {
         saved.setNotified(true);
         saved = reservationRepository.save(saved);
 
-        // 4) Analytics (best-effort, never breaks flow)
+        // 4) Analytics (best-effort)
         if (analyticsClient != null) {
             try {
                 analyticsClient.onReservationCreated(saved);
@@ -197,6 +210,16 @@ public class ReservationService {
         return saved;
     }
 
+    private static Long normalizePhoneToLong(String raw) {
+        if (raw == null) return null;
+        String digits = raw.replaceAll("\\D", "");
+        if (digits.isEmpty()) return null;
+        try {
+            return Long.parseLong(digits);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
     // ───────────────────────── Scheduling ─────────────────────────
 
     /**
