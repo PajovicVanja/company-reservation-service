@@ -14,7 +14,7 @@ public class UserDto {
     private String email;
 
     // Optional; future-proof
-    @JsonProperty("phone_number")
+    @JsonProperty("phone")
     private String phoneNumber;
 
     @JsonProperty("oauth_id")

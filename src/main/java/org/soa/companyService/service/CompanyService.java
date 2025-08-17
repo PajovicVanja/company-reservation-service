@@ -1,5 +1,6 @@
 package org.soa.companyService.service;
 
+import org.soa.companyService.exception.NotFoundException;
 import org.soa.companyService.model.Company;
 import org.soa.companyService.repository.CompanyRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +35,6 @@ public class CompanyService {
     public Company updateCompany(Long id, Company updatedCompany) {
         return companyRepository.findById(id)
                 .map(company -> {
-                    // Update fields
                     company.setDescription(updatedCompany.getDescription());
                     company.setSmsNotificationConfig(updatedCompany.getSmsNotificationConfig());
                     company.setIdPicture(updatedCompany.getIdPicture());
@@ -47,27 +47,26 @@ public class CompanyService {
                     company.setLastName(updatedCompany.getLastName());
                     company.setCompanyName(updatedCompany.getCompanyName());
                     company.setLocation(updatedCompany.getLocation());
-
-                    // Save the updated company
                     return companyRepository.save(company);
                 })
-                .orElseThrow(() -> new RuntimeException("Company not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("Company not found with id " + id));
     }
 
     public void deleteCompany(Long id) {
+        companyRepository.findById(id).orElseThrow(() -> new NotFoundException("Company not found with id " + id));
         companyRepository.deleteById(id);
     }
 
     public void uploadPicture(Long id, MultipartFile file) {
-        companyRepository.findById(id).ifPresent(company -> {
+        companyRepository.findById(id).ifPresentOrElse(company -> {
             try {
                 String path = s3ClientService.uploadPicture(file, id);
-                company.setIdPicture(path); // Update the company with the picture path
+                company.setIdPicture(path);
                 companyRepository.save(company);
             } catch (Exception e) {
                 Logger.getLogger(CompanyService.class.getName()).log(Level.SEVERE, "Failed to upload picture for company with id " + id, e);
                 throw new RuntimeException("Failed to upload picture for company with id " + id, e);
             }
-        });
+        }, () -> { throw new NotFoundException("Company not found with id " + id); });
     }
 }

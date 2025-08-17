@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.soa.companyService.dto.CreateServiceRequest;
 import org.soa.companyService.dto.UpdateServiceRequest;
 import org.soa.companyService.exception.ErrorResponse;
+import org.soa.companyService.exception.NotFoundException;
 import org.soa.companyService.model.Company;
 import org.soa.companyService.model.ServiceCategory;
 import org.soa.companyService.model.ServiceM;
@@ -60,13 +61,15 @@ public class ServiceController {
             @ApiResponse(responseCode = "200", description = "Service found",
                     content = @Content(schema = @Schema(implementation = ServiceM.class))),
             @ApiResponse(responseCode = "404", description = "Service not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"timestamp\":\"2025-08-14T08:30:45.123+02:00\",\"status\":404,\"error\":\"Not Found\",\"message\":\"Service not found with id 10\",\"path\":\"/api/services/10\"}")))
     })
     @GetMapping("/{id}")
     public ResponseEntity<ServiceM> getServiceById(
             @Parameter(description = "Service ID", example = "10") @PathVariable Long id) {
         return serviceService.getServiceById(id)
-                .map(ResponseEntity::ok).orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new NotFoundException("Service not found with id " + id));
     }
 
     @Operation(summary = "Create a new service (JSON only)")
@@ -74,12 +77,13 @@ public class ServiceController {
             @ApiResponse(responseCode = "201", description = "Service created",
                     content = @Content(schema = @Schema(implementation = ServiceM.class))),
             @ApiResponse(responseCode = "400", description = "Invalid input or referenced entities missing",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Referenced category or company not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
             content = @Content(schema = @Schema(implementation = CreateServiceRequest.class),
-                    examples = @ExampleObject(value = "{\"categoryId\":2,\"companyId\":1,\"name\":\"Massage\"," +
-                            "\"description\":\"Relax\",\"price\":50.0,\"duration\":60}")))
+                    examples = @ExampleObject(value = "{\"categoryId\":2,\"companyId\":1,\"name\":\"Massage\",\"description\":\"Relax\",\"price\":50.0,\"duration\":60}")))
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ServiceM> createService(@Valid @RequestBody CreateServiceRequest request) {
         ServiceM service = new ServiceM();
@@ -90,15 +94,15 @@ public class ServiceController {
         service.setDuration(request.getDuration());
 
         ServiceCategory category = serviceCategoryService.getServiceCategoryById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("ServiceCategory not found with id " + request.getCategoryId()));
+                .orElseThrow(() -> new NotFoundException("ServiceCategory not found with id " + request.getCategoryId()));
         service.setCategory(category);
 
         Company company = companyService.getCompanyById(request.getCompanyId())
-                .orElseThrow(() -> new RuntimeException("Company not found with id " + request.getCompanyId()));
+                .orElseThrow(() -> new NotFoundException("Company not found with id " + request.getCompanyId()));
         service.setCompany(company);
 
         ServiceM created = serviceService.createService(service);
-        return ResponseEntity.ok(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @Operation(summary = "Create a new service with picture (multipart/form-data)")
@@ -106,6 +110,8 @@ public class ServiceController {
             @ApiResponse(responseCode = "201", description = "Service created with image",
                     content = @Content(schema = @Schema(implementation = ServiceM.class))),
             @ApiResponse(responseCode = "400", description = "Invalid input or upload error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Referenced category or company not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PostMapping(value = "/with-picture", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -124,17 +130,17 @@ public class ServiceController {
         service.setDuration(request.getDuration());
 
         ServiceCategory category = serviceCategoryService.getServiceCategoryById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("ServiceCategory not found with id " + request.getCategoryId()));
+                .orElseThrow(() -> new NotFoundException("ServiceCategory not found with id " + request.getCategoryId()));
         service.setCategory(category);
 
         Company company = companyService.getCompanyById(request.getCompanyId())
-                .orElseThrow(() -> new RuntimeException("Company not found with id " + request.getCompanyId()));
+                .orElseThrow(() -> new NotFoundException("Company not found with id " + request.getCompanyId()));
         service.setCompany(company);
 
         ServiceM created = (file != null && !file.isEmpty())
                 ? serviceService.createService(service, file)
                 : serviceService.createService(service);
-        return ResponseEntity.ok(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @Operation(summary = "Update a service")
@@ -146,8 +152,7 @@ public class ServiceController {
     })
     @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
             content = @Content(schema = @Schema(implementation = UpdateServiceRequest.class),
-                    examples = @ExampleObject(value = "{\"categoryId\":2,\"companyId\":1,\"name\":\"Massage Deluxe\"," +
-                            "\"description\":\"Relax++\",\"price\":65.0,\"duration\":75}")))
+                    examples = @ExampleObject(value = "{\"categoryId\":2,\"companyId\":1,\"name\":\"Massage Deluxe\",\"description\":\"Relax++\",\"price\":65.0\",\"duration\":75}")))
     @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ServiceM> updateService(
             @Parameter(description = "Service ID", example = "10") @PathVariable Long id,
@@ -160,11 +165,11 @@ public class ServiceController {
         s.setDuration(request.getDuration());
 
         ServiceCategory category = serviceCategoryService.getServiceCategoryById(request.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("ServiceCategory not found with id " + request.getCategoryId()));
+                .orElseThrow(() -> new NotFoundException("ServiceCategory not found with id " + request.getCategoryId()));
         s.setCategory(category);
 
         Company company = companyService.getCompanyById(request.getCompanyId())
-                .orElseThrow(() -> new RuntimeException("Company not found with id " + request.getCompanyId()));
+                .orElseThrow(() -> new NotFoundException("Company not found with id " + request.getCompanyId()));
         s.setCompany(company);
 
         return ResponseEntity.ok(serviceService.updateService(id, s));

@@ -14,10 +14,10 @@ import org.soa.reservation_service.service.ReservationService;
 import org.soa.reservation_service.service.StatusService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -66,10 +66,12 @@ public class ReservationController {
     @Operation(summary = "Create a reservation",
             description = "Creates a reservation. Required: date, idService, paymentId. Optional: idCompany, employeeId, customer details.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Reservation created",
+            @ApiResponse(responseCode = "201", description = "Reservation created",
                     content = @Content(schema = @Schema(implementation = Reservation.class),
                             examples = @ExampleObject(value = "{\"id\":100,\"date\":\"2025-02-01T10:00:00.000+00:00\",\"dateTo\":\"2025-02-01T11:00:00.000+00:00\",\"idCustomer\":123,\"customerFullName\":\"John Doe\",\"status\":{\"id\":1}}"))),
-            @ApiResponse(responseCode = "500", description = "Invalid service/payment or server error",
+            @ApiResponse(responseCode = "400", description = "Invalid input or employee availability/skill failure",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Referenced entity not found (company/service/payment/user/status)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @RequestBody(required = true, content = @Content(
@@ -77,9 +79,11 @@ public class ReservationController {
             examples = @ExampleObject(value = "{\"date\":\"2025-02-01T10:00:00.000+00:00\",\"idCompany\":42,\"idService\":7,\"paymentId\":5,\"employeeId\":321,\"customerFullName\":\"John Doe\",\"customerPhoneNumber\":38640111222}")
     ))
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<Reservation> createReservation(@org.springframework.web.bind.annotation.RequestBody ReservationCreateRequest request) {
+    public ResponseEntity<Reservation> createReservation(
+            @org.springframework.web.bind.annotation.RequestBody ReservationCreateRequest request) {
         Reservation createdReservation = reservationService.createReservation(request);
-        return ResponseEntity.ok(createdReservation);
+        return ResponseEntity.created(URI.create("/api/reservations/" + createdReservation.getId()))
+                .body(createdReservation);
     }
 
     @Operation(summary = "Find free slots for a company / service",
@@ -88,13 +92,16 @@ public class ReservationController {
             @ApiResponse(responseCode = "200", description = "List of free slots",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = String.class)),
                             examples = @ExampleObject(value = "[\"09:00 - 10:00\",\"10:00 - 11:00\"]"))),
-            @ApiResponse(responseCode = "500", description = "Service not found or server error",
+            @ApiResponse(responseCode = "400", description = "Invalid query parameters or date format",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Service not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/free-slots/{idCompany}")
     public ResponseEntity<List<String>> getFreeSlots(
             @Parameter(description = "Company ID", example = "42") @PathVariable Long idCompany,
-            @Parameter(description = "Date (start of search window)", example = "2025-02-01T00:00:00") @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime date,
+            @Parameter(description = "Date (start of search window)", example = "2025-02-01T00:00:00")
+            @RequestParam("date") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime date,
             @Parameter(description = "Service ID", example = "7") @RequestParam("serviceId") Long serviceId,
             @Parameter(description = "Employee ID (optional)", example = "321") @RequestParam(value = "employeeId", required = false) Long employeeId) {
 
@@ -106,19 +113,17 @@ public class ReservationController {
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Reservation confirmed",
                     content = @Content(schema = @Schema(implementation = Reservation.class))),
-            @ApiResponse(responseCode = "404", description = "Reservation not found or invalid 2FA",
+            @ApiResponse(responseCode = "400", description = "Invalid 2FA code",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Reservation not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @PutMapping("/{id}/confirm/{twoFACode}")
     public ResponseEntity<Reservation> confirmReservation(
             @Parameter(example = "10") @PathVariable Long id,
             @Parameter(example = "123456") @PathVariable Long twoFACode) {
-        try {
-            Reservation updatedReservation = reservationService.confirmReservation(id, twoFACode);
-            return ResponseEntity.ok(updatedReservation);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        Reservation updatedReservation = reservationService.confirmReservation(id, twoFACode);
+        return ResponseEntity.ok(updatedReservation);
     }
 
     @Operation(summary = "Update reservation status")
@@ -136,12 +141,8 @@ public class ReservationController {
     public ResponseEntity<Reservation> updateReservationStatus(
             @Parameter(example = "10") @PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestBody ReservationStatusUpdateRequest request) {
-        try {
-            Reservation updatedReservation = reservationService.updateReservationStatus(id, request.getStatusId());
-            return ResponseEntity.ok(updatedReservation);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        Reservation updatedReservation = reservationService.updateReservationStatus(id, request.getStatusId());
+        return ResponseEntity.ok(updatedReservation);
     }
 
     @Operation(summary = "Admin update (hide) reservation")
@@ -159,12 +160,8 @@ public class ReservationController {
     public ResponseEntity<Reservation> adminUpdateReservation(
             @Parameter(example = "10") @PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestBody AdminReservationUpdateRequest request) {
-        try {
-            Reservation updatedReservation = reservationService.adminUpdateReservation(id, request.getStatusId());
-            return ResponseEntity.ok(updatedReservation);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        Reservation updatedReservation = reservationService.adminUpdateReservation(id, request.getStatusId());
+        return ResponseEntity.ok(updatedReservation);
     }
 
     @Operation(summary = "Delete (cancel) reservation")
@@ -176,15 +173,10 @@ public class ReservationController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReservation(
             @Parameter(example = "10") @PathVariable Long id) {
-        try {
-            reservationService.cancelReservation(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        reservationService.cancelReservation(id);
+        return ResponseEntity.noContent().build();
     }
 
-    // Employee Service calls: GET {RESERVATION_SERVICE_URL}/reservations?employee_id={employee_id}
     @Operation(summary = "List reservations by employee (for Employee Service proxy)")
     @ApiResponse(responseCode = "200", description = "List of reservations",
             content = @Content(array = @ArraySchema(schema = @Schema(implementation = Reservation.class))))

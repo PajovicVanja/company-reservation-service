@@ -1,5 +1,6 @@
 package org.soa.companyService.service;
 
+import org.soa.companyService.exception.NotFoundException;
 import org.soa.companyService.model.BusinessHours;
 import org.soa.companyService.repository.BusinessHoursRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,12 +15,10 @@ public class BusinessHoursService {
     @Autowired
     private BusinessHoursRepository businessHoursRepository;
 
-    // Get all business hours
     public List<BusinessHours> getAllBusinessHours() {
         return businessHoursRepository.findAll();
     }
 
-    // Get business hours by ID
     public Optional<BusinessHours> getBusinessHoursById(Long id) {
         return businessHoursRepository.findById(id);
     }
@@ -28,12 +27,10 @@ public class BusinessHoursService {
         return businessHoursRepository.findByCompanyId(id);
     }
 
-    // Create new business hours
     public BusinessHours createBusinessHours(BusinessHours businessHours) {
         return businessHoursRepository.save(businessHours);
     }
 
-    // Update existing business hours
     public BusinessHours updateBusinessHours(Long id, BusinessHours updatedBusinessHours) {
         return businessHoursRepository.findById(id)
                 .map(existingBusinessHours -> {
@@ -46,11 +43,12 @@ public class BusinessHoursService {
                     existingBusinessHours.setDay(updatedBusinessHours.getDay());
                     return businessHoursRepository.save(existingBusinessHours);
                 })
-                .orElseThrow(() -> new RuntimeException("BusinessHours not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("BusinessHours not found with id " + id));
     }
 
-    // Delete business hours by ID
     public void deleteBusinessHours(Long id) {
+        businessHoursRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("BusinessHours not found with id " + id));
         businessHoursRepository.deleteById(id);
     }
 }

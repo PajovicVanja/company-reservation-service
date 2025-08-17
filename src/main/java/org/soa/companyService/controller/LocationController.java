@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.soa.companyService.dto.CreateLocationRequest;
 import org.soa.companyService.dto.UpdateLocationRequest;
 import org.soa.companyService.exception.ErrorResponse;
+import org.soa.companyService.exception.NotFoundException;
 import org.soa.companyService.model.Location;
 import org.soa.companyService.service.LocationService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,13 +38,15 @@ public class LocationController {
             @ApiResponse(responseCode = "200", description = "Location found",
                     content = @Content(schema = @Schema(implementation = Location.class))),
             @ApiResponse(responseCode = "404", description = "Location not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"timestamp\":\"2025-08-14T08:30:45.123+02:00\",\"status\":404,\"error\":\"Not Found\",\"message\":\"Location not found with id 123\",\"path\":\"/api/locations/123\"}")))
     })
     @GetMapping("/{id}")
     public ResponseEntity<Location> getLocationById(
             @Parameter(description = "Location ID", example = "1") @PathVariable Long id) {
         return locationService.getLocationById(id)
-                .map(ResponseEntity::ok).orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new NotFoundException("Location not found with id " + id));
     }
 
     @Operation(summary = "Create location")
@@ -63,11 +66,11 @@ public class LocationController {
         location.setNumber(request.getNumber());
         if (request.getParentLocationId() != null) {
             Location parent = locationService.getLocationById(request.getParentLocationId())
-                    .orElseThrow(() -> new RuntimeException("Parent Location not found with id " + request.getParentLocationId()));
+                    .orElseThrow(() -> new NotFoundException("Parent Location not found with id " + request.getParentLocationId()));
             location.setParentLocation(parent);
         }
         Location created = locationService.createLocation(location);
-        return ResponseEntity.ok(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @Operation(summary = "Update location")
@@ -89,7 +92,7 @@ public class LocationController {
         loc.setNumber(request.getNumber());
         if (request.getParentLocationId() != null) {
             Location parent = locationService.getLocationById(request.getParentLocationId())
-                    .orElseThrow(() -> new RuntimeException("Parent Location not found with id " + request.getParentLocationId()));
+                    .orElseThrow(() -> new NotFoundException("Parent Location not found with id " + request.getParentLocationId()));
             loc.setParentLocation(parent);
         }
         Location updated = locationService.updateLocation(id, loc);

@@ -1,19 +1,15 @@
 package org.soa.companyService.service;
 
-import io.minio.MinioClient;
-import io.minio.ObjectWriteResponse;
-import io.minio.UploadObjectArgs;
 import io.minio.errors.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.soa.companyService.exception.NotFoundException;
 import org.soa.companyService.model.ServiceM;
 import org.soa.companyService.repository.ServiceRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
@@ -31,7 +27,6 @@ public class ServiceService {
     @Autowired
     private S3ClientService s3ClientService;
 
-    // Get all services
     public List<ServiceM> getAllServices(Long companyId) {
         return serviceRepository.findByCompanyId(companyId);
     }
@@ -40,22 +35,19 @@ public class ServiceService {
         return serviceRepository.findByCompanyIdAndCategory(companyId, category);
     }
 
-    // Get a service by ID
     public Optional<ServiceM> getServiceById(Long id) {
         return serviceRepository.findById(id);
     }
 
-    // Create a new service
     public ServiceM createService(ServiceM service) {
         return serviceRepository.save(service);
     }
 
     public ServiceM createService(ServiceM service, MultipartFile file) {
         ServiceM newService = serviceRepository.save(service);
-        return uploadPicture(newService.getId(), file); // Assuming the service has an ID after saving it to the database befo
+        return uploadPicture(newService.getId(), file);
     }
 
-    // Update an existing service
     public ServiceM updateService(Long id, ServiceM updatedService) {
         return serviceRepository.findById(id)
                 .map(existingService -> {
@@ -68,11 +60,11 @@ public class ServiceService {
                     existingService.setDuration(updatedService.getDuration());
                     return serviceRepository.save(existingService);
                 })
-                .orElseThrow(() -> new RuntimeException("Service not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("Service not found with id " + id));
     }
 
-    // Delete a service by ID
     public void deleteService(Long id) {
+        serviceRepository.findById(id).orElseThrow(() -> new NotFoundException("Service not found with id " + id));
         serviceRepository.deleteById(id);
     }
 
@@ -94,6 +86,6 @@ public class ServiceService {
                         throw new RuntimeException(e);
                     }
                 })
-                .orElseThrow(() -> new RuntimeException("Service not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("Service not found with id " + id));
     }
 }

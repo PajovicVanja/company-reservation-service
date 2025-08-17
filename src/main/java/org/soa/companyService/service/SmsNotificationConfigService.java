@@ -1,5 +1,6 @@
 package org.soa.companyService.service;
 
+import org.soa.companyService.exception.NotFoundException;
 import org.soa.companyService.model.SmsNotificationConfig;
 import org.soa.companyService.repository.SmsNotificationConfigRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,10 +38,12 @@ public class SmsNotificationConfigService {
                     }
                     return smsNotificationConfigRepository.save(existingConfig);
                 })
-                .orElseThrow(() -> new RuntimeException("SmsNotificationConfig not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("SmsNotificationConfig not found with id " + id));
     }
 
     public void deleteSmsNotificationConfig(Long id) {
+        smsNotificationConfigRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("SmsNotificationConfig not found with id " + id));
         smsNotificationConfigRepository.deleteById(id);
     }
 }

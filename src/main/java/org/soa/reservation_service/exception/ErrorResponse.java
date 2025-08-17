@@ -6,11 +6,20 @@ import java.time.OffsetDateTime;
 
 @Schema(description = "Standard error payload returned on errors")
 public class ErrorResponse {
+    public ErrorResponse() {}
     @Schema(example = "2025-08-14T08:30:45.123+02:00") private OffsetDateTime timestamp;
     @Schema(example = "404") private int status;
     @Schema(example = "Not Found") private String error;
     @Schema(example = "Entity not found") private String message;
     @Schema(example = "/api/resource/1") private String path;
+
+    public ErrorResponse(java.time.OffsetDateTime timestamp, int status, String error, String message, String path) {
+        this.timestamp = timestamp;
+        this.status = status;
+        this.error = error;
+        this.message = message;
+        this.path = path;
+    }
 
     public OffsetDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(OffsetDateTime timestamp) { this.timestamp = timestamp; }

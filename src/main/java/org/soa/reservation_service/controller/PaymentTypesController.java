@@ -12,10 +12,10 @@ import org.soa.reservation_service.exception.ErrorResponse;
 import org.soa.reservation_service.model.PaymentTypes;
 import org.soa.reservation_service.service.PaymentTypesService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -50,18 +50,18 @@ public class PaymentTypesController {
 
     @Operation(summary = "Create a payment type")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Payment type created",
+            @ApiResponse(responseCode = "201", description = "Payment type created",
                     content = @Content(schema = @Schema(implementation = PaymentTypes.class),
-                            examples = @ExampleObject(value = "{\"id\":100,\"name\":\"Cash\"}"))),
-            @ApiResponse(responseCode = "500", description = "Server error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                            examples = @ExampleObject(value = "{\"id\":100,\"name\":\"Cash\"}")))
     })
     @RequestBody(required = true, content = @Content(
             schema = @Schema(implementation = PaymentTypesCreateRequest.class),
             examples = @ExampleObject(value = "{\"name\":\"Cash\",\"durationFrom\":null,\"durationTo\":null,\"addedBy\":1}")
     ))
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<PaymentTypes> createPaymentType(@org.springframework.web.bind.annotation.RequestBody PaymentTypesCreateRequest request) {
+    public ResponseEntity<PaymentTypes> createPaymentType(
+            @org.springframework.web.bind.annotation.RequestBody PaymentTypesCreateRequest request) {
+
         PaymentTypes paymentType = new PaymentTypes();
         paymentType.setName(request.getName());
         paymentType.setDurationFrom(request.getDurationFrom());
@@ -70,7 +70,8 @@ public class PaymentTypesController {
         paymentType.setDeletedBy(request.getDeletedBy());
 
         PaymentTypes createdPaymentType = paymentTypesService.createPaymentType(paymentType);
-        return ResponseEntity.ok(createdPaymentType);
+        return ResponseEntity.created(URI.create("/api/payment-types/" + createdPaymentType.getId()))
+                .body(createdPaymentType);
     }
 
     @Operation(summary = "Update a payment type")
@@ -88,26 +89,21 @@ public class PaymentTypesController {
     public ResponseEntity<PaymentTypes> updatePaymentType(
             @Parameter(description = "Payment type ID", example = "1") @PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestBody PaymentTypesUpdateRequest request) {
-        try {
-            PaymentTypes paymentType = new PaymentTypes();
-            paymentType.setName(request.getName());
-            paymentType.setDurationFrom(request.getDurationFrom());
-            paymentType.setDurationTo(request.getDurationTo());
-            paymentType.setAddedBy(request.getAddedBy());
-            paymentType.setDeletedBy(request.getDeletedBy());
 
-            PaymentTypes updatedPaymentType = paymentTypesService.updatePaymentType(id, paymentType);
-            return ResponseEntity.ok(updatedPaymentType);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        PaymentTypes paymentType = new PaymentTypes();
+        paymentType.setName(request.getName());
+        paymentType.setDurationFrom(request.getDurationFrom());
+        paymentType.setDurationTo(request.getDurationTo());
+        paymentType.setAddedBy(request.getAddedBy());
+        paymentType.setDeletedBy(request.getDeletedBy());
+
+        PaymentTypes updatedPaymentType = paymentTypesService.updatePaymentType(id, paymentType);
+        return ResponseEntity.ok(updatedPaymentType);
     }
 
     @Operation(summary = "Delete a payment type")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Payment type deleted"),
-            @ApiResponse(responseCode = "500", description = "Server error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "204", description = "Payment type deleted")
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePaymentType(

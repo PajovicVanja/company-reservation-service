@@ -1,9 +1,6 @@
 package org.soa.reservation_service.repository;
 
-import org.aspectj.lang.annotation.AfterThrowing;
-import org.soa.reservation_service.dto.Revenue;
 import org.soa.reservation_service.model.Reservation;
-import org.soa.reservation_service.service.interfaces.IDashboardService;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -38,14 +35,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
 
     @Query("SELECT DATE(r.date), COUNT(r) as count FROM Reservation r WHERE r.company.id = ?1 group by DATE(r.date)")
     List<Objects> dailyRevenue(long companyId);
-//    @Query("SELECT r FROM Reservation r WHERE r.company.id = ?1 group by week(r.date)")
-//    List<Revenue> weeklyRevenue(long companyId);
-//
+
     @Query("SELECT month(r.date), COUNT(r) FROM Reservation r WHERE r.company.id = ?1 group by month(r.date)")
     List<Objects> monthlyRevenue(long companyId);
 
     List<Reservation> findByEmployeeId(Long employeeId);
-
-
-
 }

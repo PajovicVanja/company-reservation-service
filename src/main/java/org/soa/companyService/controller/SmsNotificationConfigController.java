@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.soa.companyService.dto.CreateSmsNotificationConfigRequest;
 import org.soa.companyService.dto.UpdateSmsNotificationConfigRequest;
 import org.soa.companyService.exception.ErrorResponse;
+import org.soa.companyService.exception.NotFoundException;
 import org.soa.companyService.model.SmsNotificationConfig;
 import org.soa.companyService.service.SmsNotificationConfigService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,13 +40,15 @@ public class SmsNotificationConfigController {
             @ApiResponse(responseCode = "200", description = "Config found",
                     content = @Content(schema = @Schema(implementation = SmsNotificationConfig.class))),
             @ApiResponse(responseCode = "404", description = "Config not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"timestamp\":\"2025-08-14T08:30:45.123+02:00\",\"status\":404,\"error\":\"Not Found\",\"message\":\"SmsNotificationConfig not found with id 123\",\"path\":\"/api/sms-notification-configs/123\"}")))
     })
     @GetMapping("/{id}")
     public ResponseEntity<SmsNotificationConfig> getSmsNotificationConfigById(
             @Parameter(description = "Config ID", example = "1") @PathVariable Long id) {
         return smsNotificationConfigService.getSmsNotificationConfigById(id)
-                .map(ResponseEntity::ok).orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new NotFoundException("SmsNotificationConfig not found with id " + id));
     }
 
     @Operation(summary = "Create a new SMS notification configuration")
@@ -61,7 +64,7 @@ public class SmsNotificationConfigController {
         cfg.setName(request.getName());
         cfg.setNotificationMessage(request.getNotificationMessage());
         SmsNotificationConfig created = smsNotificationConfigService.createSmsNotificationConfig(cfg);
-        return ResponseEntity.ok(created);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @Operation(summary = "Update an SMS notification configuration")
@@ -86,7 +89,9 @@ public class SmsNotificationConfigController {
 
     @Operation(summary = "Delete an SMS notification configuration")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Config deleted")
+            @ApiResponse(responseCode = "204", description = "Config deleted"),
+            @ApiResponse(responseCode = "404", description = "Config not found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteSmsNotificationConfig(

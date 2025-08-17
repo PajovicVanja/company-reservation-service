@@ -23,6 +23,7 @@ public class S3ClientService {
     @Value("${MINIO_ACCESS_KEY}")
     private String accessKey;
 
+    // NOTE: property name kept as-is to match existing env var; if your env uses MINIO_SECRET_KEY, update here too.
     @Value("${MINIO_SECRETE_KEY}")
     private String secretKey;
 
@@ -35,7 +36,6 @@ public class S3ClientService {
                     .credentials(accessKey, secretKey)
                     .build();
         }
-
         return this.minioClient;
     }
 
@@ -51,14 +51,15 @@ public class S3ClientService {
             InternalException {
         File tempFile = File.createTempFile("upload-", file.getOriginalFilename());
         file.transferTo(tempFile);
+        String objectName = "companies/"+ idCompany +"/pictures/profilePicture_" + idCompany + "_" + file.getOriginalFilename();
         UploadObjectArgs uploadObjectArgs = UploadObjectArgs.builder()
                 .bucket(this.bucketName)
-                .object("companies/"+ idCompany +"/pictures/profilePicture_" + idCompany + "_" + file.getOriginalFilename()) // Define the object name
+                .object(objectName)
                 .filename(tempFile.getAbsolutePath())
-                .contentType(file.getContentType()) // Use the original filename or generate a unique one
+                .contentType(file.getContentType())
                 .build();
         this.getClient().uploadObject(uploadObjectArgs);
-        return this.endpoint + this.bucketName + "/companies/"+ idCompany +"/pictures/profilePicture_" + idCompany + "_" + file.getOriginalFilename();
+        return this.endpoint + this.bucketName + "/" + objectName;
     }
 
     public String uploadPicture (MultipartFile file, Long idService, Long idCompany) throws
@@ -73,16 +74,15 @@ public class S3ClientService {
             InternalException {
         File tempFile = File.createTempFile("upload-", file.getOriginalFilename());
         file.transferTo(tempFile);
+        String objectName = "companies/" + idCompany
+                + "/services/pictures/service_picture_" + idService + "_" + file.getOriginalFilename();
         UploadObjectArgs uploadObjectArgs = UploadObjectArgs.builder()
                 .bucket(this.bucketName)
-                .object("companies/" + idCompany
-                        + "/services/pictures/service_picture_" + idCompany + "_" + file.getOriginalFilename())
+                .object(objectName)
                 .filename(tempFile.getAbsolutePath())
                 .contentType(file.getContentType())
                 .build();
         this.getClient().uploadObject(uploadObjectArgs);
-         return this.endpoint + this.bucketName
-                         + "/companies/" + idCompany
-                         + "/services/pictures/service_picture_" + idService + "_" + file.getOriginalFilename();
+        return this.endpoint + this.bucketName + "/" + objectName;
     }
 }

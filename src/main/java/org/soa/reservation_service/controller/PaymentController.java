@@ -2,13 +2,9 @@ package org.soa.reservation_service.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.media.*;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.responses.*;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.soa.reservation_service.dto.PaymentCreateRequest;
 import org.soa.reservation_service.dto.PaymentUpdateRequest;
@@ -17,10 +13,10 @@ import org.soa.reservation_service.model.Payment;
 import org.soa.reservation_service.service.PaymentService;
 import org.soa.reservation_service.service.PaymentTypesService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -45,8 +41,6 @@ public class PaymentController {
                     content = @Content(schema = @Schema(implementation = Payment.class),
                             examples = @ExampleObject(value = "{\"id\":10,\"status\":\"PAID\",\"datePaid\":\"2025-01-31T09:15:00.000+00:00\",\"amount\":49.99,\"paymentTypes\":{\"id\":1,\"name\":\"Cash\"}}"))),
             @ApiResponse(responseCode = "404", description = "Payment not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Server error",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @GetMapping("/{id}")
@@ -59,10 +53,10 @@ public class PaymentController {
 
     @Operation(summary = "Create a payment", description = "Creates a new payment.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Payment created",
+            @ApiResponse(responseCode = "201", description = "Payment created",
                     content = @Content(schema = @Schema(implementation = Payment.class),
                             examples = @ExampleObject(value = "{\"id\":100,\"status\":\"PAID\",\"datePaid\":\"2025-01-31T09:15:00.000+00:00\",\"amount\":49.99,\"paymentTypes\":{\"id\":1}}"))),
-            @ApiResponse(responseCode = "500", description = "Failed to resolve payment type or server error",
+            @ApiResponse(responseCode = "400", description = "Invalid payload or unknown payment type",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @RequestBody(required = true, content = @Content(
@@ -78,11 +72,13 @@ public class PaymentController {
 
         if (request.getPaymentTypeId() != null) {
             payment.setPaymentTypes(paymentTypesService.getPaymentTypeById(request.getPaymentTypeId())
-                    .orElseThrow(() -> new RuntimeException("Payment Type not found with id " + request.getPaymentTypeId())));
+                    .orElseThrow(() -> new org.soa.reservation_service.exception.NotFoundException(
+                            "Payment Type not found with id " + request.getPaymentTypeId())));
         }
 
         Payment createdPayment = paymentService.createPayment(payment);
-        return ResponseEntity.ok(createdPayment);
+        return ResponseEntity.created(URI.create("/api/payments/" + createdPayment.getId()))
+                .body(createdPayment);
     }
 
     @Operation(summary = "Update a payment", description = "Updates an existing payment by its ID.")
@@ -90,8 +86,6 @@ public class PaymentController {
             @ApiResponse(responseCode = "200", description = "Payment updated",
                     content = @Content(schema = @Schema(implementation = Payment.class))),
             @ApiResponse(responseCode = "404", description = "Payment or referenced type not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "500", description = "Server error",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @RequestBody(required = true, content = @Content(
@@ -102,29 +96,24 @@ public class PaymentController {
     public ResponseEntity<Payment> updatePayment(
             @Parameter(description = "Payment ID", example = "10") @PathVariable Long id,
             @org.springframework.web.bind.annotation.RequestBody PaymentUpdateRequest request) {
-        try {
-            Payment payment = new Payment();
-            payment.setStatus(request.getStatus());
-            payment.setDatePaid(request.getDatePaid());
-            payment.setAmount(request.getAmount());
+        Payment payment = new Payment();
+        payment.setStatus(request.getStatus());
+        payment.setDatePaid(request.getDatePaid());
+        payment.setAmount(request.getAmount());
 
-            if (request.getPaymentTypeId() != null) {
-                payment.setPaymentTypes(paymentTypesService.getPaymentTypeById(request.getPaymentTypeId())
-                        .orElseThrow(() -> new RuntimeException("Payment Type not found with id " + request.getPaymentTypeId())));
-            }
-
-            Payment updatedPayment = paymentService.updatePayment(id, payment);
-            return ResponseEntity.ok(updatedPayment);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+        if (request.getPaymentTypeId() != null) {
+            payment.setPaymentTypes(paymentTypesService.getPaymentTypeById(request.getPaymentTypeId())
+                    .orElseThrow(() -> new org.soa.reservation_service.exception.NotFoundException(
+                            "Payment Type not found with id " + request.getPaymentTypeId())));
         }
+
+        Payment updatedPayment = paymentService.updatePayment(id, payment);
+        return ResponseEntity.ok(updatedPayment);
     }
 
     @Operation(summary = "Delete a payment", description = "Deletes a payment by its ID.")
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Payment deleted"),
-            @ApiResponse(responseCode = "500", description = "Server error",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+            @ApiResponse(responseCode = "204", description = "Payment deleted")
     })
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePayment(

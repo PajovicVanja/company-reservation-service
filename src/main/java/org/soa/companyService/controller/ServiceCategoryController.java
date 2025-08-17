@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import org.soa.companyService.dto.CreateServiceCategoryRequest;
 import org.soa.companyService.dto.UpdateServiceCategoryRequest;
 import org.soa.companyService.exception.ErrorResponse;
+import org.soa.companyService.exception.NotFoundException;
 import org.soa.companyService.model.Company;
 import org.soa.companyService.model.ServiceCategory;
 import org.soa.companyService.service.CompanyService;
@@ -42,13 +43,15 @@ public class ServiceCategoryController {
             @ApiResponse(responseCode = "200", description = "Category found",
                     content = @Content(schema = @Schema(implementation = ServiceCategory.class))),
             @ApiResponse(responseCode = "404", description = "Category not found",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"timestamp\":\"2025-08-14T08:30:45.123+02:00\",\"status\":404,\"error\":\"Not Found\",\"message\":\"ServiceCategory not found with id 123\",\"path\":\"/api/service-categories/123\"}")))
     })
     @GetMapping("/{id}")
     public ResponseEntity<ServiceCategory> getServiceCategoryById(
             @Parameter(description = "Category ID", example = "1") @PathVariable Long id) {
         return serviceCategoryService.getServiceCategoryById(id)
-                .map(ResponseEntity::ok).orElse(ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+                .map(ResponseEntity::ok)
+                .orElseThrow(() -> new NotFoundException("ServiceCategory not found with id " + id));
     }
 
     @Operation(summary = "Get service categories by company UUID")
@@ -65,6 +68,8 @@ public class ServiceCategoryController {
             @ApiResponse(responseCode = "201", description = "Category created",
                     content = @Content(schema = @Schema(implementation = ServiceCategory.class))),
             @ApiResponse(responseCode = "400", description = "Invalid input",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "404", description = "Company not found",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     @io.swagger.v3.oas.annotations.parameters.RequestBody(required = true,
@@ -75,9 +80,9 @@ public class ServiceCategoryController {
         ServiceCategory cat = new ServiceCategory();
         cat.setName(request.getName());
         Company company = companyService.getCompanyById(request.getCompanyId())
-                .orElseThrow(() -> new RuntimeException("Company not found with id " + request.getCompanyId()));
+                .orElseThrow(() -> new NotFoundException("Company not found with id " + request.getCompanyId()));
         cat.setCompany(company);
-        return ResponseEntity.ok(serviceCategoryService.createServiceCategory(cat));
+        return ResponseEntity.status(HttpStatus.CREATED).body(serviceCategoryService.createServiceCategory(cat));
     }
 
     @Operation(summary = "Update service category")
@@ -97,7 +102,7 @@ public class ServiceCategoryController {
         ServiceCategory cat = new ServiceCategory();
         cat.setName(request.getName());
         Company company = companyService.getCompanyById(request.getCompanyId())
-                .orElseThrow(() -> new RuntimeException("Company not found with id " + request.getCompanyId()));
+                .orElseThrow(() -> new NotFoundException("Company not found with id " + request.getCompanyId()));
         cat.setCompany(company);
         return ResponseEntity.ok(serviceCategoryService.updateServiceCategory(id, cat));
     }

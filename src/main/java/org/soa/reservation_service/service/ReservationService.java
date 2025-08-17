@@ -9,10 +9,12 @@ import org.soa.companyService.service.ServiceService;
 import org.soa.reservation_service.client.DiscountClient;
 import org.soa.reservation_service.client.EmployeeClient;
 import org.soa.reservation_service.client.UserClient;
-import org.soa.reservation_service.client.AnalyticsClient; // ⬅ added
+import org.soa.reservation_service.client.AnalyticsClient;
 import org.soa.reservation_service.dto.ReservationCreateRequest;
 import org.soa.reservation_service.dto.TimeInterval;
 import org.soa.reservation_service.dto.UserDto;
+import org.soa.reservation_service.exception.BadRequestException;
+import org.soa.reservation_service.exception.NotFoundException;
 import org.soa.reservation_service.model.Reservation;
 import org.soa.reservation_service.model.ScheduledNotifications;
 import org.soa.reservation_service.model.Status;
@@ -42,10 +44,10 @@ public class ReservationService {
     @Autowired private CompanyService companyService;
     @Autowired private PaymentService paymentService;
     @Autowired private ScheduledNotificationsService scheduledNotificationsService;
-    @Autowired(required = false) private DiscountClient discountClient; // optional
+    @Autowired(required = false) private DiscountClient discountClient;
     @Autowired private EmployeeClient employeeClient;
     @Autowired private ReservationNotificationService reservationNotificationService;
-    @Autowired private UserClient userClient; // user-service lookup
+    @Autowired private UserClient userClient;
     @Autowired(required = false) private AnalyticsClient analyticsClient;
 
     @Value("${CUSTOMER_FALLBACK_ID:0}")
@@ -56,8 +58,6 @@ public class ReservationService {
         if (fromReq != null) return fromReq;
         return (customerFallbackId != null ? customerFallbackId : 0);
     }
-
-    // ───────────────────────── Queries ─────────────────────────
 
     public List<Reservation> getAllReservationsByCompany(Long idCompany) {
         return reservationRepository.findByIdCompany(idCompany);
@@ -79,75 +79,58 @@ public class ReservationService {
         return reservationRepository.findById(id);
     }
 
-    // ───────────────────────── Create ─────────────────────────
-
-    /** Save the reservation, create a scheduled reminder timestamp, send immediate SMS, mark notified=true. */
     @Transactional
     public Reservation createReservation(ReservationCreateRequest reservation) {
         Reservation newReservation = new Reservation();
 
-        // required/core fields
         newReservation.setDate(reservation.getDate());
         Integer resolvedCustomerId = resolveCustomerId(reservation);
-        newReservation.setIdCustomer(resolvedCustomerId); // Integer ✔
+        newReservation.setIdCustomer(resolvedCustomerId);
         long sixDigits = ThreadLocalRandom.current().nextInt(100_000, 1_000_000);
         newReservation.setTwoFACode(sixDigits);
         newReservation.setNotified(false);
         newReservation.setHidden(false);
 
-        // company (optional)
         Company company = (reservation.getIdCompany() != null)
                 ? companyService.getCompanyById(reservation.getIdCompany())
-                .orElseThrow(() -> new RuntimeException("Company not found with id " + reservation.getIdCompany()))
+                .orElseThrow(() -> new NotFoundException("Company not found with id " + reservation.getIdCompany()))
                 : null;
         newReservation.setCompany(company);
 
-        // service (required)
         ServiceM service = serviceService.getServiceById(reservation.getIdService())
-                .orElseThrow(() -> new RuntimeException("Service not found with id " + reservation.getIdService()));
+                .orElseThrow(() -> new NotFoundException("Service not found with id " + reservation.getIdService()));
         newReservation.setService(service);
 
-        // compute end time from service duration
         newReservation.setDateTo(
                 Timestamp.valueOf(reservation.getDate().toLocalDateTime().plusMinutes(service.getDuration()))
         );
 
-        // default status
         newReservation.setStatus(statusService.getDefaultStatus());
 
-        // payment (required)
         newReservation.setPayment(
                 paymentService.getPaymentById(reservation.getPaymentId())
-                        .orElseThrow(() -> new RuntimeException("Payment not found with id " + reservation.getPaymentId()))
+                        .orElseThrow(() -> new NotFoundException("Payment not found with id " + reservation.getPaymentId()))
         );
 
-        // Start with values from the request payload
         String fullName = reservation.getCustomerFullName();
         Long phone = reservation.getCustomerPhoneNumber();
         String email = reservation.getCustomerEmail();
 
-        // If the caller provided a real user id (>0), we must verify it exists
         if (resolvedCustomerId != null && resolvedCustomerId > 0) {
             var userOpt = userClient.getUserById(resolvedCustomerId);
             if (userOpt.isEmpty()) {
-                // hard fail: do not create reservation for non-existing user
-                throw new RuntimeException("User not found with id " + resolvedCustomerId);
+                throw new NotFoundException("User not found with id " + resolvedCustomerId);
             }
             UserDto user = userOpt.get();
 
-            // Prefer first_name + last_name coming from user-service
             String fromServiceName = user.getFullName();
             if (fromServiceName != null && !fromServiceName.isBlank()) {
                 fullName = fromServiceName;
             }
-
-            // Future-proof phone: try to read it if the service starts returning it
             if (phone == null) {
                 Long phoneFromService = normalizePhoneToLong(user.getPhoneNumber());
                 if (phoneFromService != null) phone = phoneFromService;
             }
-
-            // Prefer email from user-service if request is empty
             if ((email == null || email.isBlank()) && user.getEmail() != null && !user.getEmail().isBlank()) {
                 email = user.getEmail();
             }
@@ -157,7 +140,6 @@ public class ReservationService {
         newReservation.setCustomerPhoneNumber(phone);
         newReservation.setCustomerEmail(email);
 
-        // employee checks (optional if employeeId missing)
         newReservation.setEmployeeId(reservation.getEmployeeId());
         if (reservation.getEmployeeId() != null) {
             employeeClient.assertEmployeeActive(reservation.getEmployeeId());
@@ -169,8 +151,7 @@ public class ReservationService {
             );
         }
 
-        // Discounts only if both customer & company are present and a discount client exists
-        Integer customerIdInt = newReservation.getIdCustomer(); // Integer ✔
+        Integer customerIdInt = newReservation.getIdCustomer();
         Long companyIdLong = reservation.getIdCompany();
         Integer companyIdInt = (companyIdLong != null ? companyIdLong.intValue() : null);
         Long serviceIdLong = reservation.getIdService();
@@ -185,20 +166,16 @@ public class ReservationService {
             }
         }
 
-        // 1) Persist reservation FIRST to ensure we have a non-null ID
         Reservation saved = reservationRepository.save(newReservation);
 
-        // 2) Compute and store scheduled reminder time
         LocalDateTime scheduled = calculateSmsNotificationTime(saved.getDate(), saved);
         saved.setSendSms(Timestamp.valueOf(scheduled));
         saved = reservationRepository.save(saved);
 
-        // 3) Send IMMEDIATE confirmation SMS and flip notified=true
         reservationNotificationService.sendReservationCreated(saved);
         saved.setNotified(true);
         saved = reservationRepository.save(saved);
 
-        // 4) Analytics (best-effort)
         if (analyticsClient != null) {
             try {
                 analyticsClient.onReservationCreated(saved);
@@ -220,12 +197,7 @@ public class ReservationService {
             return null;
         }
     }
-    // ───────────────────────── Scheduling ─────────────────────────
 
-    /**
-     * Decide the SMS scheduled time for future reminder.
-     * Falls back to "1 hour before" if company or config is missing/unknown.
-     */
     public LocalDateTime calculateSmsNotificationTime(Timestamp date, Reservation reservation) {
         LocalDateTime start = date.toLocalDateTime();
         LocalDateTime scheduledTime;
@@ -242,7 +214,6 @@ public class ReservationService {
                 scheduledTime = start.minusHours(24);
                 break;
             default:
-                // Safe default if misconfigured: one hour before
                 scheduledTime = start.minusHours(1);
                 break;
         }
@@ -259,24 +230,22 @@ public class ReservationService {
         return notification.getScheduledTime();
     }
 
-    // ───────────────────────── Mutations ─────────────────────────
-
     public Reservation updateReservationStatus(Long id, Long statusId) {
         return reservationRepository.findById(id)
                 .map(existingReservation -> {
                     Status status = statusService.getStatusById(statusId)
-                            .orElseThrow(() -> new RuntimeException("Status not found with id " + statusId));
+                            .orElseThrow(() -> new NotFoundException("Status not found with id " + statusId));
                     existingReservation.setStatus(status);
                     return reservationRepository.save(existingReservation);
                 })
-                .orElseThrow(() -> new RuntimeException("Reservation not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("Reservation not found with id " + id));
     }
 
     public void cancelReservation(Long id) {
         Reservation reservation = reservationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Reservation not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("Reservation not found with id " + id));
         Status canceledStatus = statusService.findStatusByName("Preklicano")
-                .orElseThrow(() -> new RuntimeException("Status Preklicano not found"));
+                .orElseThrow(() -> new NotFoundException("Status Preklicano not found"));
         reservation.setStatus(canceledStatus);
         reservationRepository.save(reservation);
     }
@@ -285,12 +254,12 @@ public class ReservationService {
         return reservationRepository.findById(id)
                 .map(existingReservation -> {
                     Status status = statusService.getStatusById(statusId)
-                            .orElseThrow(() -> new RuntimeException("Status not found with id " + statusId));
+                            .orElseThrow(() -> new NotFoundException("Status not found with id " + statusId));
                     existingReservation.setStatus(status);
                     existingReservation.setHidden(true);
                     return reservationRepository.save(existingReservation);
                 })
-                .orElseThrow(() -> new RuntimeException("Reservation not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("Reservation not found with id " + id));
     }
 
     public Reservation confirmReservation(Long id, Long twoFACode) {
@@ -298,20 +267,18 @@ public class ReservationService {
                 .map(existingReservation -> {
                     Status status = statusService.getConfirmStatus();
                     if (!existingReservation.getTwoFACode().equals(twoFACode)) {
-                        throw new RuntimeException("Invalid two-factor authentication code");
+                        throw new BadRequestException("Invalid two-factor authentication code");
                     }
                     existingReservation.setStatus(status);
                     return reservationRepository.save(existingReservation);
                 })
-                .orElseThrow(() -> new RuntimeException("Reservation not found with id " + id));
+                .orElseThrow(() -> new NotFoundException("Reservation not found with id " + id));
     }
-
-    // ───────────────────────── Availability (free slots) ─────────────────────────
 
     public List<String> getFreeSlots(Long idCompany, LocalDateTime date, Long idService, Long employeeId) {
         Optional<ServiceM> serviceM = serviceService.getServiceById(idService);
         if (serviceM.isEmpty()) {
-            throw new RuntimeException("Service not found with id " + idService);
+            throw new NotFoundException("Service not found with id " + idService);
         }
 
         var businessHoursList = businessHoursService.getBusinessHoursByCompanyId(idCompany);
@@ -328,7 +295,6 @@ public class ReservationService {
         var busyIntervals = getBusyHours(listOfUsedTermins, bh);
         busyIntervals.sort(Comparator.comparing(i -> i.start));
 
-        // free intervals = BH minus busy
         List<TimeInterval> freeIntervals = new ArrayList<>();
         LocalTime current = bh.getTimeFrom().toLocalTime();
         for (TimeInterval busy : busyIntervals) {
@@ -341,7 +307,6 @@ public class ReservationService {
 
         Duration serviceDuration = Duration.ofMinutes(serviceM.get().getDuration());
 
-        // slice free intervals into service-sized slots
         List<TimeInterval> availableSlots = new ArrayList<>();
         for (TimeInterval free : freeIntervals) {
             LocalTime slotStart = free.start;
@@ -359,10 +324,9 @@ public class ReservationService {
                 .toList();
     }
 
-    private List<TimeInterval> getBusyHours(List<Reservation> listOfUsedTermins, org.soa.companyService.model.BusinessHours businessHour) {
+    private List<TimeInterval> getBusyHours(List<Reservation> listOfUsedTermins, BusinessHours businessHour) {
         List<TimeInterval> busySlots = new ArrayList<>();
 
-        // lunch/pause
         if (businessHour.getPauseFrom() != null && businessHour.getPauseTo() != null) {
             busySlots.add(new TimeInterval(
                     businessHour.getPauseFrom().toLocalTime(),
