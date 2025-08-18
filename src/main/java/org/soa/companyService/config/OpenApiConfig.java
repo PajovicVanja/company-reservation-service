@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
                 contact = @Contact(name = "API Support", email = "support@example.com")
         ),
         servers = {
-                @Server(url = "http://localhost:8080", description = "Local"),
+                @Server(url = "http://localhost:8082", description = "Local"),
                 @Server(url = "https://api.example.com", description = "Prod")
         }
 )

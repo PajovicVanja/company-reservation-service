@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   company-service:
@@ -10,8 +9,6 @@ services:
     restart: unless-stopped
     ports:
       - "8082:8082"
-    env_file:
-      - .env.company
     environment:
       # Database
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:mysql://db-mysql-fra1-44936-do-user-18276591-0.k.db.ondigitalocean.com:25060/comapny_reservation}

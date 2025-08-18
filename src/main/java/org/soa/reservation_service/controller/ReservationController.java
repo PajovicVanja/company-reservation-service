@@ -76,7 +76,7 @@ public class ReservationController {
     })
     @RequestBody(required = true, content = @Content(
             schema = @Schema(implementation = ReservationCreateRequest.class),
-            examples = @ExampleObject(value = "{\"date\":\"2025-02-01T10:00:00.000+00:00\",\"idCompany\":42,\"idService\":7,\"paymentId\":5,\"employeeId\":321,\"customerFullName\":\"John Doe\",\"customerPhoneNumber\":38640111222}")
+            examples = @ExampleObject(value = "{\"date\":\"2025-02-01T10:00:00.000+00:00\",\"idCompany\":42,\"idService\":7,\"paymentId\":5,\"employeeId\":1,\"customerFullName\":\"John Doe\",\"idCustomer\":1}")
     ))
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Reservation> createReservation(
