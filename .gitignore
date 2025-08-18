@@ -37,3 +37,5 @@ build/
 /set-env.ps1
 /reservation_service.txt
 /companyService.txt
+/src/main/java/org/soa/ExportJavaFiles.java
+/image.png

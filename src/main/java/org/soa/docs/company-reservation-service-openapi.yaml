@@ -1,0 +1,1907 @@
+openapi: 3.0.3
+info:
+  title: Company & Reservation Service API
+  version: v1
+  description: >
+    OpenAPI documentation for **Company** (companies, locations, service categories, services, business hours,
+    notifications) and **Reservation** (reservations, payments, payment types, statuses) services.
+servers:
+  - url: http://localhost:8082
+    description: Company Local
+  - url: https://api.example.com
+    description: Company Prod
+  - url: http://localhost:8081
+    description: Reservation Local
+  - url: https://reservation.example.com
+    description: Reservation Prod
+tags:
+  - name: Company
+    description: Company management API
+  - name: Location
+    description: Location management API
+  - name: Service Category
+    description: Service Category management API
+  - name: Service
+    description: Service management API
+  - name: Business Hours
+    description: Business Hours management API
+  - name: Notifications - SMS
+    description: Proxy endpoints that send SMS via the sms-faas GraphQL on Vercel
+  - name: SMS Notification Config
+    description: SMS Notification Configuration API
+  - name: Reservations
+    description: Create and manage reservations
+  - name: Payments
+    description: Manage payments
+  - name: Payment Types
+    description: Manage payment types
+  - name: Statuses
+    description: Manage reservation statuses
+  - name: Probe - Employees
+    description: Lightweight passthroughs to Employee Service for debugging/integration checks
+paths:
+  ############################################################
+  # Company domain
+  ############################################################
+  /api/companies:
+    get:
+      tags: [Company]
+      summary: Get all companies
+      description: Returns a list of all companies
+      responses:
+        "200":
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Company"
+    post:
+      tags: [Company]
+      summary: Create a new company
+      description: Creates a new company with the provided information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCompanyRequest"
+      responses:
+        "201":
+          description: Company created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "400":
+          description: Invalid input or referenced entities not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/companies/{id}:
+    get:
+      tags: [Company]
+      summary: Get company by ID
+      description: Returns a single company by its ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: ID of the company to retrieve
+      responses:
+        "200":
+          description: Company found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "404":
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Company]
+      summary: Update a company
+      description: Updates an existing company by its ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: ID of the company to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCompanyRequest"
+      responses:
+        "200":
+          description: Company updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Company"
+        "404":
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "400":
+          description: Invalid input or referenced entities not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Company]
+      summary: Delete a company
+      description: Deletes a company by its ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: ID of the company to delete
+      responses:
+        "204":
+          description: Company deleted
+        "404":
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/companies/{id}/upload-picture:
+    post:
+      tags: [Company]
+      summary: Upload company picture
+      description: Uploads a picture for a specific company
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: ID of the company to upload picture for
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Picture uploaded
+        "404":
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Upload failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/locations:
+    get:
+      tags: [Location]
+      summary: Get all locations
+      responses:
+        "200":
+          description: List of locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Location"
+    post:
+      tags: [Location]
+      summary: Create location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLocationRequest"
+      responses:
+        "201":
+          description: Location created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/locations/{id}:
+    get:
+      tags: [Location]
+      summary: Get location by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Location ID
+      responses:
+        "200":
+          description: Location found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+        "404":
+          description: Location not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Location]
+      summary: Update location
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Location ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLocationRequest"
+      responses:
+        "200":
+          description: Location updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+        "404":
+          description: Location not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Location]
+      summary: Delete location
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Location ID
+      responses:
+        "204":
+          description: Location deleted
+        "404":
+          description: Location not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/service-categories:
+    get:
+      tags: [Service Category]
+      summary: Get all service categories
+      responses:
+        "200":
+          description: List of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceCategory"
+    post:
+      tags: [Service Category]
+      summary: Create service category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceCategoryRequest"
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategory"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/service-categories/{id}:
+    get:
+      tags: [Service Category]
+      summary: Get service category by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Category ID
+      responses:
+        "200":
+          description: Category found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategory"
+        "404":
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Service Category]
+      summary: Update service category
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Category ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceCategoryRequest"
+      responses:
+        "200":
+          description: Category updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceCategory"
+        "404":
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Service Category]
+      summary: Delete category
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Category ID
+      responses:
+        "204":
+          description: Category deleted
+        "404":
+          description: Category not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/service-categories/company/{id}:
+    get:
+      tags: [Service Category]
+      summary: Get service categories by company UUID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+          description: Company UUID
+      responses:
+        "200":
+          description: Categories for company UUID
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceCategory"
+
+  /api/services/company/{idCompany}:
+    get:
+      tags: [Service]
+      summary: List services for a company
+      parameters:
+        - in: path
+          name: idCompany
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Company ID
+      responses:
+        "200":
+          description: List of services
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceM"
+  /api/services/company/{idCompany}/category/{idCategory}:
+    get:
+      tags: [Service]
+      summary: List services for a company and category
+      parameters:
+        - in: path
+          name: idCompany
+          required: true
+          schema: { type: integer, format: int64 }
+        - in: path
+          name: idCategory
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: List filtered by category
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceM"
+  /api/services/{id}:
+    get:
+      tags: [Service]
+      summary: Get service by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Service ID
+      responses:
+        "200":
+          description: Service found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceM"
+        "404":
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Service]
+      summary: Update a service
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Service ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServiceRequest"
+      responses:
+        "200":
+          description: Service updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceM"
+        "404":
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Service]
+      summary: Delete a service
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Service ID
+      responses:
+        "204":
+          description: Service deleted
+        "404":
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/services:
+    post:
+      tags: [Service]
+      summary: Create a new service (JSON only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServiceRequest"
+      responses:
+        "201":
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceM"
+        "400":
+          description: Invalid input or referenced entities missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Referenced category or company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/services/with-picture:
+    post:
+      tags: [Service]
+      summary: Create a new service with picture (multipart/form-data)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                request:
+                  description: JSON payload for service
+                  type: string
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Service created with image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceM"
+        "400":
+          description: Invalid input or upload error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Referenced category or company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/services/{id}/upload-picture:
+    post:
+      tags: [Service]
+      summary: Upload service picture
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Service ID
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Picture uploaded
+        "404":
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Upload failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/business-hours:
+    get:
+      tags: [Business Hours]
+      summary: Get all business hours
+      responses:
+        "200":
+          description: List of business hours
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BusinessHours"
+    post:
+      tags: [Business Hours]
+      summary: Create new business hours
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBusinessHoursRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessHours"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/business-hours/company/{companyId}:
+    get:
+      tags: [Business Hours]
+      summary: Get business hours by company ID
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Company ID
+      responses:
+        "200":
+          description: List for company
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BusinessHours"
+        "404":
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/business-hours/{id}:
+    get:
+      tags: [Business Hours]
+      summary: Get business hours by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Business hours ID
+      responses:
+        "200":
+          description: Entry found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessHours"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Business Hours]
+      summary: Update business hours
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Business hours ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBusinessHoursRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BusinessHours"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Business Hours]
+      summary: Delete business hours
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Business hours ID
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/sms-notification-configs:
+    get:
+      tags: [SMS Notification Config]
+      summary: Get all SMS notification configurations
+      responses:
+        "200":
+          description: List of configs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SmsNotificationConfig"
+    post:
+      tags: [SMS Notification Config]
+      summary: Create a new SMS notification configuration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSmsNotificationConfigRequest"
+      responses:
+        "201":
+          description: Config created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsNotificationConfig"
+  /api/sms-notification-configs/{id}:
+    get:
+      tags: [SMS Notification Config]
+      summary: Get SMS notification configuration by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Config ID
+      responses:
+        "200":
+          description: Config found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsNotificationConfig"
+        "404":
+          description: Config not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [SMS Notification Config]
+      summary: Update an SMS notification configuration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Config ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSmsNotificationConfigRequest"
+      responses:
+        "200":
+          description: Config updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SmsNotificationConfig"
+        "404":
+          description: Config not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [SMS Notification Config]
+      summary: Delete an SMS notification configuration
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Config ID
+      responses:
+        "204":
+          description: Config deleted
+        "404":
+          description: Config not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/notifications/sms/send:
+    post:
+      tags: [Notifications - SMS]
+      summary: Send an SMS (via sms-faas GraphQL)
+      description: >
+        If 'templateId' is provided, 'variables' will be used to render the message. Otherwise, provide a 'message'.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendSmsRequest"
+      responses:
+        "200":
+          description: SMS send attempt result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendSmsResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: sms-faas upstream error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  ############################################################
+  # Reservation domain
+  ############################################################
+  /api/reservations/company/{idCompany}:
+    get:
+      tags: [Reservations]
+      summary: List reservations for a company
+      parameters:
+        - in: path
+          name: idCompany
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Company ID
+      responses:
+        "200":
+          description: List of reservations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+  /api/reservations/user/{idUser}:
+    get:
+      tags: [Reservations]
+      summary: List reservations for a user
+      parameters:
+        - in: path
+          name: idUser
+          required: true
+          schema: { type: integer, format: int64 }
+          description: User ID
+      responses:
+        "200":
+          description: List of reservations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+  /api/reservations/{id}:
+    get:
+      tags: [Reservations]
+      summary: Get reservation by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Reservation ID
+      responses:
+        "200":
+          description: Reservation found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "404":
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Reservations]
+      summary: Delete (cancel) reservation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "204":
+          description: Reservation canceled
+        "404":
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/reservations:
+    get:
+      tags: [Reservations]
+      summary: List reservations by employee (for Employee Service proxy)
+      parameters:
+        - in: query
+          name: employee_id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Employee ID
+      responses:
+        "200":
+          description: List of reservations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+    post:
+      tags: [Reservations]
+      summary: Create a reservation
+      description: >
+        Creates a reservation. Required: date, idService, paymentId. Optional: idCompany, employeeId, customer details.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationCreateRequest"
+      responses:
+        "201":
+          description: Reservation created
+          headers:
+            Location:
+              description: URI of the created reservation
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          description: Invalid input or employee availability/skill failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Referenced entity not found (company/service/payment/user/status)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/reservations/free-slots/{idCompany}:
+    get:
+      tags: [Reservations]
+      summary: Find free slots for a company / service
+      description: Returns a list of available HH:mm - HH:mm slots on the given day.
+      parameters:
+        - in: path
+          name: idCompany
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Company ID
+        - in: query
+          name: date
+          required: true
+          schema: { type: string, format: date-time }
+          description: Date (start of search window)
+        - in: query
+          name: serviceId
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Service ID
+        - in: query
+          name: employeeId
+          required: false
+          schema: { type: integer, format: int64 }
+          description: Employee ID (optional)
+      responses:
+        "200":
+          description: List of free slots
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+        "400":
+          description: Invalid query parameters or date format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Service not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/reservations/{id}/confirm/{twoFACode}:
+    put:
+      tags: [Reservations]
+      summary: Confirm reservation with 2FA code
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+        - in: path
+          name: twoFACode
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Reservation confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "400":
+          description: Invalid 2FA code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Reservation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/reservations/{id}/status:
+    put:
+      tags: [Reservations]
+      summary: Update reservation status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationStatusUpdateRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "404":
+          description: Reservation or status not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/reservations/admin/{id}:
+    put:
+      tags: [Reservations]
+      summary: Admin update (hide) reservation
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReservationUpdateRequest"
+      responses:
+        "200":
+          description: Reservation updated (hidden)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+        "404":
+          description: Reservation or status not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/payments:
+    get:
+      tags: [Payments]
+      summary: Get all payments
+      description: Returns a list of all payments.
+      responses:
+        "200":
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payment"
+    post:
+      tags: [Payments]
+      summary: Create a payment
+      description: Creates a new payment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentCreateRequest"
+      responses:
+        "201":
+          description: Payment created
+          headers:
+            Location:
+              description: URI of the created payment
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "400":
+            description: Invalid payload or unknown payment type
+            content:
+              application/json:
+                schema:
+                  $ref: "#/components/schemas/ErrorResponse"
+  /api/payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Get payment by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Payment ID
+      responses:
+        "200":
+          description: Payment found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "404":
+          description: Payment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Payments]
+      summary: Update a payment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Payment ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentUpdateRequest"
+      responses:
+        "200":
+          description: Payment updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Payment"
+        "404":
+          description: Payment or referenced type not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Payments]
+      summary: Delete a payment
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "204":
+          description: Payment deleted
+
+  /api/payment-types:
+    get:
+      tags: [Payment Types]
+      summary: Get all payment types
+      responses:
+        "200":
+          description: List of payment types
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PaymentTypes"
+    post:
+      tags: [Payment Types]
+      summary: Create a payment type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentTypesCreateRequest"
+      responses:
+        "201":
+          description: Payment type created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentTypes"
+  /api/payment-types/{id}:
+    get:
+      tags: [Payment Types]
+      summary: Get payment type by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Payment type found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentTypes"
+        "404":
+          description: Payment type not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Payment Types]
+      summary: Update a payment type
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentTypesUpdateRequest"
+      responses:
+        "200":
+          description: Payment type updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentTypes"
+        "404":
+          description: Payment type not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Payment Types]
+      summary: Delete a payment type
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "204":
+          description: Payment type deleted
+
+  /api/statuses:
+    get:
+      tags: [Statuses]
+      summary: Get all statuses
+      responses:
+        "200":
+          description: List of statuses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Status"
+    post:
+      tags: [Statuses]
+      summary: Create a status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusCreateRequest"
+      responses:
+        "200":
+          description: Status created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/statuses/{id}:
+    get:
+      tags: [Statuses]
+      summary: Get status by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Status found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+        "404":
+          description: Status not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      tags: [Statuses]
+      summary: Update a status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdateRequest"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Status"
+        "404":
+          description: Status not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      tags: [Statuses]
+      summary: Delete a status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "204":
+          description: Status deleted
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/_probe/employees/{id}:
+    get:
+      tags: [Probe - Employees]
+      summary: Get raw employee payload
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+          description: Employee ID
+      responses:
+        "200":
+          description: Employee payload
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "404":
+          description: Employee not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/_probe/employees/{id}/skills:
+    get:
+      tags: [Probe - Employees]
+      summary: Get employee skills
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: List of skills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+  /api/_probe/employees/{id}/availability:
+    get:
+      tags: [Probe - Employees]
+      summary: Get employee availability
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Availability rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+  /api/_probe/employees/{id}/assert-active:
+    get:
+      tags: [Probe - Employees]
+      summary: Assert employee is active
+      description: Returns 204 if active; 404 otherwise.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "204":
+          description: Employee active – no content
+        "404":
+          description: Employee inactive or missing
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    ############################################################
+    # Shared / Error
+    ############################################################
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp: { type: string, format: date-time, example: "2025-08-14T08:30:45.123+02:00" }
+        status:    { type: integer, example: 404 }
+        error:     { type: string, example: "Not Found" }
+        message:   { type: string, example: "Entity not found" }
+        path:      { type: string, example: "/api/resource/1" }
+
+    ############################################################
+    # Company domain models & DTOs
+    ############################################################
+    Company:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        description: { type: string }
+        smsNotificationConfig:
+          $ref: "#/components/schemas/SmsNotificationConfig"
+        idPicture: { type: string, description: "Public image object key or path" }
+        createdAt: { type: string, format: date-time }
+        idAuthUser: { type: string }
+        uuidUrl: { type: string }
+        address: { type: string }
+        phoneNumber: { type: string }
+        email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
+        companyName: { type: string }
+        location:
+          $ref: "#/components/schemas/Location"
+    CreateCompanyRequest:
+      type: object
+      required: [address, phoneNumber, email, companyName, locationId, smsNotificationConfigId]
+      properties:
+        description: { type: string, example: "Men haircuts" }
+        idPicture: { type: string, example: "profilePicture_1.png" }
+        idAuthUser: { type: string, example: "auth-123" }
+        uuidUrl: { type: string, example: "abc-uuid" }
+        address: { type: string, example: "Main street 1" }
+        phoneNumber: { type: string, example: "+38640111222" }
+        email: { type: string, format: email, example: "info@barber.si" }
+        firstName: { type: string, example: "Nina" }
+        lastName: { type: string, example: "Kos" }
+        companyName: { type: string, example: "Barber Shop" }
+        locationId: { type: integer, format: int64, example: 1 }
+        smsNotificationConfigId: { type: integer, format: int64, example: 1 }
+    UpdateCompanyRequest:
+      type: object
+      required: [locationId, smsNotificationConfigId]
+      properties:
+        description: { type: string, example: "Updated desc" }
+        idPicture: { type: string, example: "profilePicture_1.png" }
+        address: { type: string, example: "Main 2" }
+        phoneNumber: { type: string, example: "+38640123456" }
+        email: { type: string, format: email, example: "contact@barber.si" }
+        firstName: { type: string, example: "Nina" }
+        lastName: { type: string, example: "Kos" }
+        companyName: { type: string, example: "Barber Shop" }
+        locationId: { type: integer, format: int64, example: 1 }
+        smsNotificationConfigId: { type: integer, format: int64, example: 1 }
+
+    Location:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        street: { type: string }
+        number: { type: string }
+        parentLocation:
+          $ref: "#/components/schemas/Location"
+    CreateLocationRequest:
+      type: object
+      required: [name, number]
+      properties:
+        name: { type: string, example: "Trg Leona" }
+        number: { type: string, example: "3" }
+        parentLocationId: { type: integer, format: int64, example: 1 }
+    UpdateLocationRequest:
+      type: object
+      required: [name, number]
+      properties:
+        name: { type: string, example: "Nova ulica" }
+        number: { type: string, example: "12" }
+        parentLocationId: { type: integer, format: int64, example: 1 }
+
+    ServiceCategory:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        name: { type: string }
+        company:
+          $ref: "#/components/schemas/Company"
+    CreateServiceCategoryRequest:
+      type: object
+      required: [name, companyId]
+      properties:
+        name: { type: string, example: "Hair" }
+        companyId: { type: integer, format: int64, example: 1 }
+    UpdateServiceCategoryRequest:
+      type: object
+      required: [name, companyId]
+      properties:
+        name: { type: string, example: "Massage" }
+        companyId: { type: integer, format: int64, example: 1 }
+
+    ServiceM:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        category:
+          $ref: "#/components/schemas/ServiceCategory"
+        createdAt: { type: string, format: date-time }
+        company:
+          $ref: "#/components/schemas/Company"
+        name: { type: string }
+        description: { type: string }
+        price: { type: number, format: float }
+        idPicture: { type: string }
+        duration: { type: integer, format: int32, description: "Duration in minutes" }
+    CreateServiceRequest:
+      type: object
+      required: [categoryId, companyId, name, price, duration]
+      properties:
+        categoryId: { type: integer, format: int64, example: 2 }
+        companyId: { type: integer, format: int64, example: 1 }
+        name: { type: string, example: "Massage" }
+        description: { type: string, example: "Relax" }
+        price: { type: number, format: float, example: 50.0 }
+        idPicture: { type: string, example: "service_picture.png" }
+        duration: { type: integer, format: int32, example: 60 }
+    UpdateServiceRequest:
+      type: object
+      required: [categoryId, companyId, name, price, duration]
+      properties:
+        categoryId: { type: integer, format: int64, example: 2 }
+        companyId: { type: integer, format: int64, example: 1 }
+        name: { type: string, example: "Massage Deluxe" }
+        description: { type: string, example: "Relax++" }
+        price: { type: number, format: float, example: 65.0 }
+        idPicture: { type: string, example: "service_picture.png" }
+        duration: { type: integer, format: int32, example: 75 }
+
+    BusinessHours:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        dayNumber: { type: integer, format: int32 }
+        createdAt: { type: string, format: date-time }
+        timeFrom: { type: string, format: time }
+        timeTo: { type: string, format: time }
+        pauseFrom: { type: string, format: time, nullable: true }
+        pauseTo: { type: string, format: time, nullable: true }
+        company:
+          $ref: "#/components/schemas/Company"
+        day: { type: string }
+    CreateBusinessHoursRequest:
+      type: object
+      required: [dayNumber, timeFrom, timeTo, companyId, day]
+      properties:
+        dayNumber: { type: integer, example: 1 }
+        timeFrom: { type: string, format: time, example: "09:00:00" }
+        timeTo: { type: string, format: time, example: "17:00:00" }
+        pauseFrom: { type: string, format: time, example: "12:00:00" }
+        pauseTo: { type: string, format: time, example: "12:30:00" }
+        companyId: { type: integer, format: int64, example: 1 }
+        day: { type: string, example: "MONDAY" }
+    UpdateBusinessHoursRequest:
+      type: object
+      required: [dayNumber, timeFrom, timeTo, companyId, day]
+      properties:
+        dayNumber: { type: integer, example: 2 }
+        timeFrom: { type: string, format: time, example: "10:00:00" }
+        timeTo: { type: string, format: time, example: "18:00:00" }
+        pauseFrom: { type: string, format: time, example: "12:30:00" }
+        pauseTo: { type: string, format: time, example: "13:00:00" }
+        companyId: { type: integer, format: int64, example: 1 }
+        day: { type: string, example: "TUESDAY" }
+
+    SmsNotificationConfig:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        name: { type: string }
+        notificationMessage: { type: string }
+    CreateSmsNotificationConfigRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: "Default" }
+        notificationMessage: { type: string, example: "Reminder: your appointment is tomorrow." }
+    UpdateSmsNotificationConfigRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, example: "Default" }
+        notificationMessage: { type: string, example: "Reminder: your appointment is tomorrow." }
+
+    SendSmsRequest:
+      type: object
+      required: [phone]
+      properties:
+        phone: { type: string, example: "+38640111222" }
+        templateId: { type: string, description: "Template ID to render (optional if 'message' is provided)" }
+        message: { type: string, description: "Raw message text (optional if 'templateId' is provided)" }
+        variables:
+          type: object
+          additionalProperties:
+            type: string
+          description: "Template variables: used when templateId is provided."
+    SendSmsResponse:
+      type: object
+      properties:
+        ok: { type: boolean, example: true }
+        status: { type: string, example: "SENT" }
+        id: { type: string, example: "689f7b068dca95494412ae19" }
+        phone: { type: string, example: "+38640111222" }
+        message: { type: string, example: "Hi Ana, your appointment is at 10:30." }
+        createdAt: { type: string, example: "2025-08-15T18:23:02.376Z" }
+
+    ############################################################
+    # Reservation domain models & DTOs
+    ############################################################
+    Reservation:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        createdAt: { type: string, format: date-time }
+        date: { type: string, format: date-time }
+        dateTo: { type: string, format: date-time }
+        company:
+          $ref: "#/components/schemas/Company"
+        service:
+          $ref: "#/components/schemas/ServiceM"
+        idCustomer: { type: integer, format: int32 }
+        employeeId: { type: integer, format: int64, description: "Plain employee id (no FK)" }
+        sendSms: { type: string, format: date-time }
+        twoFACode: { type: integer, format: int64 }
+        hidden: { type: boolean }
+        customerEmail: { type: string, format: email }
+        customerPhoneNumber: { type: integer, format: int64 }
+        customerFullName: { type: string }
+        status:
+          $ref: "#/components/schemas/Status"
+        payment:
+          $ref: "#/components/schemas/Payment"
+        notified: { type: boolean }
+    ReservationCreateRequest:
+      type: object
+      required: [date, idService, paymentId]
+      properties:
+        date: { type: string, format: date-time, example: "2025-02-01T10:00:00.000+00:00" }
+        idCompany: { type: integer, format: int64, example: 42, description: "FK to Company" }
+        idService: { type: integer, format: int64, example: 7, description: "FK to Service" }
+        idCustomer: { type: integer, example: 123 }
+        sendSms: { type: string, format: date-time, example: "2025-02-01T09:00:00.000+00:00" }
+        twoFACode: { type: integer, format: int64, example: 123456 }
+        hidden: { type: boolean, example: false }
+        customerEmail: { type: string, format: email, example: "john@example.com" }
+        customerPhoneNumber: { type: integer, format: int64, example: 38640111222 }
+        customerFullName: { type: string, example: "John Doe" }
+        statusId: { type: integer, format: int64, example: 1, description: "FK to Status" }
+        paymentId: { type: integer, format: int64, example: 5, description: "FK to Payment" }
+        employeeId: { type: integer, format: int64, example: 321, description: "Plain employee id (no FK)" }
+    ReservationStatusUpdateRequest:
+      type: object
+      required: [statusId]
+      properties:
+        statusId: { type: integer, format: int64, example: 2 }
+    AdminReservationUpdateRequest:
+      type: object
+      required: [statusId]
+      properties:
+        statusId: { type: integer, format: int64, example: 3 }
+
+    Payment:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        paymentTypes:
+          $ref: "#/components/schemas/PaymentTypes"
+        status: { type: string }
+        datePaid: { type: string, format: date-time }
+        amount: { type: number, format: double }
+    PaymentCreateRequest:
+      type: object
+      properties:
+        paymentTypeId: { type: integer, format: int64, description: "FK to Payment Type", example: 1 }
+        status: { type: string, example: "PAID" }
+        datePaid: { type: string, format: date-time, example: "2025-01-31T09:15:00.000+00:00" }
+        amount: { type: number, format: double, example: 49.99 }
+    PaymentUpdateRequest:
+      type: object
+      properties:
+        paymentTypeId: { type: integer, format: int64, description: "FK to Payment Type", example: 1 }
+        status: { type: string, example: "REFUNDED" }
+        datePaid: { type: string, format: date-time, example: "2025-02-01T12:00:00.000+00:00" }
+        amount: { type: number, format: double, example: 49.99 }
+
+    PaymentTypes:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        durationFrom: { type: string, format: date-time, nullable: true }
+        durationTo: { type: string, format: date-time, nullable: true }
+        addedBy: { type: integer, format: int64, nullable: true }
+        deletedBy: { type: integer, format: int64, nullable: true }
+    PaymentTypesCreateRequest:
+      type: object
+      properties:
+        name: { type: string, example: "Cash" }
+        durationFrom: { type: string, format: date-time, nullable: true, example: "2025-01-01T00:00:00.000+00:00" }
+        durationTo: { type: string, format: date-time, nullable: true, example: "2025-12-31T23:59:59.000+00:00" }
+        addedBy: { type: integer, format: int64, nullable: true, example: 1 }
+        deletedBy: { type: integer, format: int64, nullable: true, example: 2 }
+    PaymentTypesUpdateRequest:
+      type: object
+      properties:
+        name: { type: string, example: "Card" }
+        durationFrom: { type: string, format: date-time, nullable: true, example: "2025-01-01T00:00:00.000+00:00" }
+        durationTo: { type: string, format: date-time, nullable: true, example: "2025-12-31T23:59:59.000+00:00" }
+        addedBy: { type: integer, format: int64, nullable: true, example: 1 }
+        deletedBy: { type: integer, format: int64, nullable: true, example: 2 }
+
+    Status:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        createdAt: { type: string, format: date-time }
+        addedBy: { type: integer, format: int64 }
+    StatusCreateRequest:
+      type: object
+      properties:
+        name: { type: string, example: "Created" }
+        addedBy: { type: integer, format: int64, example: 1 }
+    StatusUpdateRequest:
+      type: object
+      properties:
+        name: { type: string, example: "Confirmed" }
+        addedBy: { type: integer, format: int64, example: 2 }
